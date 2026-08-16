@@ -61,6 +61,8 @@ function buildThinkingParams(
       return { thinking: { type: enabled ? "enabled" : "disabled" } };
     case "qwen":
       return { enable_thinking: enabled };
+    case "zhipu":
+      return { thinking: { type: enabled ? "enabled" : "disabled" } };
     case "openai":
       // gpt-5 系列默认思考；关闭时用 reasoning_effort: none
       return enabled ? null : { reasoning_effort: "none" };

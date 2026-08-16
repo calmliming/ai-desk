@@ -57,6 +57,38 @@ export const PROVIDER_PRESETS: ProviderConfig[] = [
     ],
     builtin: true,
   },
+  {
+    id: "gemini",
+    name: "Google · Gemini",
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+    apiKey: "",
+    models: ["gemini-3", "gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
+    builtin: true,
+  },
+  {
+    id: "grok",
+    name: "xAI · Grok",
+    baseURL: "https://api.x.ai/v1",
+    apiKey: "",
+    models: ["grok-5", "grok-4.1", "grok-4.1-mini", "grok-3-mini"],
+    builtin: true,
+  },
+  {
+    id: "zhipu",
+    name: "智谱 · GLM",
+    baseURL: "https://open.bigmodel.cn/api/paas/v4",
+    apiKey: "",
+    models: ["glm-5", "glm-4.7", "glm-4.7-flash", "glm-4.5-air"],
+    builtin: true,
+  },
+  {
+    id: "minimax",
+    name: "MiniMax",
+    baseURL: "https://api.minimax.chat/v1",
+    apiKey: "",
+    models: ["minimax-m2.7", "minimax-m2.5"],
+    builtin: true,
+  },
 ];
 
 export const CUSTOM_PROVIDER: ProviderConfig = {
