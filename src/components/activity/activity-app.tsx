@@ -20,6 +20,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "settings", label: "⚙️ 设置" },
   { id: "file", label: "📎 文件" },
   { id: "session", label: "🗂️ 会话" },
+  { id: "project", label: "📁 项目" },
 ];
 
 function formatTime(ts: number): string {

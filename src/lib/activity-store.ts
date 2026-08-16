@@ -8,7 +8,8 @@ export type ActivityType =
   | "prompt"
   | "settings"
   | "file"
-  | "session";
+  | "session"
+  | "project";
 
 export interface ActivityEntry {
   id: string;
@@ -27,6 +28,7 @@ export const ACTIVITY_META: Record<ActivityType, { label: string; emoji: string 
   settings: { label: "设置", emoji: "⚙️" },
   file: { label: "文件", emoji: "📎" },
   session: { label: "会话", emoji: "🗂️" },
+  project: { label: "项目", emoji: "📁" },
 };
 
 const ACTIVITY_KEY = "aidesk.activity.v1";

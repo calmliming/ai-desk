@@ -6,6 +6,7 @@ import {
   IconCheck,
   IconCompare,
   IconFile,
+  IconFolder,
   IconKey,
   IconPrompts,
   IconSparkle,
@@ -46,6 +47,13 @@ const FEATURES = [
     icon: IconFile,
     title: "文件对话",
     desc: "上传 PDF、文档或图片，让 AI 阅读内容并回答。",
+    ready: true,
+  },
+  {
+    href: "/projects",
+    icon: IconFolder,
+    title: "项目管理",
+    desc: "多项目时间线跟踪：开发、测试、上线全流程。",
     ready: true,
   },
   {
