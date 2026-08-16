@@ -6,6 +6,9 @@ interface CommandState {
   query: string;
 }
 
+/** 服务端快照：固定引用，避免 getServerSnapshot 无限循环警告 */
+const SERVER_SNAPSHOT: CommandState = { open: false, query: "" };
+
 let state: CommandState = { open: false, query: "" };
 const listeners = new Set<() => void>();
 
@@ -25,7 +28,7 @@ function emit(): void {
 }
 
 export function useCommandState(): CommandState {
-  return useSyncExternalStore(subscribe, getSnapshot, () => ({ open: false, query: "" }));
+  return useSyncExternalStore(subscribe, getSnapshot, () => SERVER_SNAPSHOT);
 }
 
 export function openCommandPalette(): void {
