@@ -1,36 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AIDesk · AI 工作台
 
-## Getting Started
+自用的多模型 AI 工作台 Web 应用：AI 对话、多模型对比、文本工具、提示词库与文件对话。
 
-First, run the development server:
+## 技术栈
+
+- **Next.js 16.3.1**（App Router + Turbopack）
+- **React 19.2.8** / TypeScript 5.9
+- **Tailwind CSS 4.3**
+- 包管理器：pnpm
+
+## 快速开始
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+pnpm dev            # http://localhost:3000
+pnpm build          # 生产构建
+pnpm lint           # 代码检查
+pnpm generate:icons # 重新生成站点图标（icon.svg / icon.png / apple-icon.png）
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+首次使用：进入「设置」页，选择一个提供商（DeepSeek / OpenAI / Moonshot / 通义千问 / 自定义
+OpenAI 兼容接口）并填入 API Key。密钥仅保存在浏览器 localStorage，不写入代码库。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 功能路线
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [x] 应用骨架：侧边栏导航、深浅色主题、提供商设置页
+- [x] AI 对话：流式输出、多会话历史、Markdown 渲染 + 代码高亮
+- [x] 多模型对比：并发请求、并排展示、复制回答
+- [x] 文本工具：翻译 / 摘要 / 改写 / 代码解释 + 对话内 /快捷指令
+- [x] 提示词库：变量占位、一键套用、导入导出、内置模板
+- [x] 文件对话：PDF 文本提取、文本文件、图片视觉输入
+- [x] 扩展：会话搜索 / Markdown・JSON 导出、Token 统计、角色预设、温度与最大输出参数
