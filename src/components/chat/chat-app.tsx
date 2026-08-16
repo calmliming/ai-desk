@@ -75,9 +75,16 @@ export default function ChatApp() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [selectedId]);
 
-  const scrollToBottom = () => {
+  /**
+   * 滚动到底部：force=true 强制（发送/切换会话）；
+   * 否则仅当用户本来就在底部附近才跟随（用户上翻时不再强拉，可自由查看历史）。
+   */
+  const scrollToBottom = (force = false) => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    if (force || el.scrollHeight - el.scrollTop - el.clientHeight < 80) {
+      el.scrollTop = el.scrollHeight;
+    }
   };
 
   const handleNew = () => {
@@ -261,7 +268,7 @@ export default function ChatApp() {
 
     setStreaming(true);
     setError(null);
-    scrollToBottom();
+    scrollToBottom(true);
     logActivity(
       "chat",
       `发送消息（${target.model}）`,
@@ -279,6 +286,42 @@ export default function ChatApp() {
       abortRef.current = null;
     };
 
+    // —— 流式增量按帧批量提交，避免每个 token 触发一次全量渲染 ——
+    const pending = { content: "", reasoning: "" };
+    let rafId = 0;
+    const flushPending = () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = 0;
+      }
+      const content = pending.content;
+      const reasoning = pending.reasoning;
+      pending.content = "";
+      pending.reasoning = "";
+      if (!content && !reasoning) return;
+      updateSessions(
+        (prev) =>
+          prev.map((s) =>
+            s.id === target.id
+              ? {
+                  ...s,
+                  updatedAt: timestamp(),
+                  messages: s.messages.map((m) =>
+                    m.id === assistantMsg.id
+                      ? {
+                          ...m,
+                          content: m.content + content,
+                          reasoning: (m.reasoning ?? "") + reasoning,
+                        }
+                      : m,
+                  ),
+                }
+              : s,
+          ),
+        { persist: false },
+      );
+    };
+
     await streamChat(
       {
         baseURL: requestProvider.baseURL,
@@ -292,28 +335,15 @@ export default function ChatApp() {
       },
       {
         onDelta: (content, reasoning) => {
-          updateSessions(
-            (prev) =>
-              prev.map((s) =>
-                s.id === target.id
-                  ? {
-                      ...s,
-                      updatedAt: timestamp(),
-                      messages: s.messages.map((m) =>
-                        m.id === assistantMsg.id
-                          ? {
-                              ...m,
-                              content: m.content + content,
-                              reasoning: (m.reasoning ?? "") + reasoning,
-                            }
-                          : m,
-                      ),
-                    }
-                  : s,
-              ),
-            { persist: false },
-          );
-          scrollToBottom();
+          pending.content += content;
+          pending.reasoning += reasoning;
+          if (!rafId) {
+            rafId = requestAnimationFrame(() => {
+              rafId = 0;
+              flushPending();
+              scrollToBottom();
+            });
+          }
         },
         onUsage: (usage: UsageStats) => {
           updateSessions(
@@ -369,10 +399,12 @@ export default function ChatApp() {
           );
         },
         onDone: () => {
+          flushPending();
           setStreaming(false);
           finish();
         },
         onError: (message) => {
+          flushPending();
           setStreaming(false);
           setError(message);
           updateSessions(
