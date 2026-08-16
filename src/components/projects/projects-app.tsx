@@ -9,11 +9,12 @@ import {
   createProject,
   deleteProject,
   deleteProjectLog,
+  updateProjectLog,
   updateProjects,
   useProjects,
   type Project,
 } from "@/lib/projects-store";
-import { IconPlus, IconTrash, IconX } from "../icons";
+import { IconEdit, IconPlus, IconTrash, IconX } from "../icons";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2 text-sm outline-none transition-colors placeholder:text-zinc-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-700 dark:bg-zinc-950/60";
@@ -31,6 +32,8 @@ export default function ProjectsApp() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [logText, setLogText] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
 
   const effectiveId = selectedId ?? projects[0]?.id ?? null;
   const project = projects.find((p) => p.id === effectiveId) ?? null;
@@ -82,6 +85,24 @@ export default function ProjectsApp() {
     deleteProjectLog(project.id, logId);
     logActivity("project", "删除项目记录", project.name);
     toast.success("已删除该记录");
+  };
+
+  const startEditLog = (logId: string, text: string) => {
+    setEditingId(logId);
+    setEditText(text);
+  };
+
+  const saveEditLog = () => {
+    if (!project || !editingId) return;
+    const text = editText.trim();
+    if (!text) {
+      setEditingId(null);
+      return;
+    }
+    updateProjectLog(project.id, editingId, text);
+    logActivity("project", "修改项目记录", project.name);
+    toast.success("记录已更新");
+    setEditingId(null);
   };
 
   return (
@@ -198,21 +219,54 @@ export default function ProjectsApp() {
                   <div key={log.id} className="group relative flex gap-3">
                     <span className="z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500 ring-2 ring-zinc-50 dark:ring-zinc-950/40" />
                     <div className="min-w-0 flex-1">
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">
-                        {log.text}
-                      </p>
-                      <p className="mt-0.5 text-[10px] tabular-nums text-zinc-400 dark:text-zinc-600">
-                        {formatDateTime(log.time)}
-                      </p>
+                      {editingId === log.id ? (
+                        <input
+                          type="text"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                              e.preventDefault();
+                              saveEditLog();
+                            } else if (e.key === "Escape") {
+                              setEditingId(null);
+                            }
+                          }}
+                          onBlur={saveEditLog}
+                          className="w-full rounded-md border border-amber-500 bg-white px-2 py-1 text-sm outline-none ring-2 ring-amber-500/20 dark:bg-zinc-950/60"
+                          autoFocus
+                        />
+                      ) : (
+                        <>
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">
+                            {log.text}
+                          </p>
+                          <p className="mt-0.5 text-[10px] tabular-nums text-zinc-400 dark:text-zinc-600">
+                            {formatDateTime(log.time)}
+                          </p>
+                        </>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteLog(log.id, log.text)}
-                      className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-md text-zinc-300 opacity-0 transition-all hover:bg-red-500/10 hover:text-red-500 group-hover:opacity-100"
-                      title="删除这条记录"
-                    >
-                      <IconX width={12} height={12} />
-                    </button>
+                    {editingId !== log.id && (
+                      <span className="absolute right-0 top-0 flex items-center gap-0.5 opacity-0 transition-all group-hover:opacity-100">
+                        <button
+                          type="button"
+                          onClick={() => startEditLog(log.id, log.text)}
+                          className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-300 transition-colors hover:bg-amber-500/10 hover:text-orange-500"
+                          title="修改这条记录"
+                        >
+                          <IconEdit width={12} height={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteLog(log.id, log.text)}
+                          className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-300 transition-colors hover:bg-red-500/10 hover:text-red-500"
+                          title="删除这条记录"
+                        >
+                          <IconX width={12} height={12} />
+                        </button>
+                      </span>
+                    )}
                   </div>
                 ))}
                 {project.logs.length === 0 && (

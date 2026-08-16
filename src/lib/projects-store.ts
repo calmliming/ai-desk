@@ -454,3 +454,20 @@ export function deleteProjectLog(id: string, logId: string): void {
     ),
   );
 }
+
+/** 修改单条记录内容 */
+export function updateProjectLog(id: string, logId: string, text: string): void {
+  const content = text.trim();
+  if (!content) return;
+  updateProjects((prev) =>
+    prev.map((p) =>
+      p.id === id
+        ? {
+            ...p,
+            logs: p.logs.map((l) => (l.id === logId ? { ...l, text: content } : l)),
+            updatedAt: Date.now(),
+          }
+        : p,
+    ),
+  );
+}
