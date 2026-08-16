@@ -40,7 +40,7 @@ const NAV_MAIN: NavItem[] = [
   { href: "/compare", label: "模型对比", icon: IconCompare },
   { href: "/tools", label: "文本工具", icon: IconTools },
   { href: "/prompts", label: "提示词库", icon: IconPrompts },
-  { href: "/projects", label: "项目管理", icon: IconFolder },
+  { href: "/projects", label: "项目记录", icon: IconFolder },
 ];
 
 const NAV_SYS: NavItem[] = [

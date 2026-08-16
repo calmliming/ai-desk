@@ -52,8 +52,8 @@ const FEATURES = [
   {
     href: "/projects",
     icon: IconFolder,
-    title: "项目管理",
-    desc: "多项目时间线跟踪：开发、测试、上线全流程。",
+    title: "项目记录",
+    desc: "简单记录每个项目在什么时间做了什么。",
     ready: true,
   },
   {
