@@ -22,6 +22,26 @@ export interface Session {
 const SESSIONS_KEY = "aidesk.sessions.v1";
 const SERVER_SNAPSHOT: Session[] = [];
 
+/** 已停用模型 → 现行替代模型（加载旧会话时自动迁移） */
+const RETIRED_MODELS: Record<string, string> = {
+  "deepseek-chat": "deepseek-v4-flash",
+  "deepseek-reasoner": "deepseek-v4-pro",
+  "gpt-4o": "gpt-5",
+  "gpt-4o-mini": "gpt-5.4-mini",
+  "o3-mini": "gpt-5.4-mini",
+  "gpt-4.1": "gpt-5",
+  "moonshot-v1-8k": "kimi-k3",
+  "moonshot-v1-32k": "kimi-k3",
+  "moonshot-v1-128k": "kimi-k3",
+  "kimi-k2.6": "kimi-k3",
+  "qwen-turbo": "qwen-plus",
+};
+
+function migrateSession(s: Session): Session {
+  const next = RETIRED_MODELS[s.model];
+  return next ? { ...s, model: next } : s;
+}
+
 let current: Session[] | null = null;
 const listeners = new Set<() => void>();
 
@@ -31,7 +51,7 @@ function load(): Session[] {
     const raw = window.localStorage.getItem(SESSIONS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as Session[]) : [];
+    return Array.isArray(parsed) ? (parsed as Session[]).map(migrateSession) : [];
   } catch {
     return [];
   }

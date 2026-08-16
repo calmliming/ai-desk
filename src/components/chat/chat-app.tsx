@@ -347,6 +347,22 @@ export default function ChatApp() {
             { persist: false },
           );
         },
+        onModel: (modelUsed) => {
+          updateSessions(
+            (prev) =>
+              prev.map((s) =>
+                s.id === target.id
+                  ? {
+                      ...s,
+                      messages: s.messages.map((m) =>
+                        m.id === assistantMsg.id ? { ...m, modelUsed } : m,
+                      ),
+                    }
+                  : s,
+              ),
+            { persist: false },
+          );
+        },
         onDone: () => {
           setStreaming(false);
           finish();

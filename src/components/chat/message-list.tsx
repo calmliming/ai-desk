@@ -81,6 +81,11 @@ export default function MessageList({
                       ↑{m.usage.promptTokens} ↓{m.usage.completionTokens} tokens
                     </span>
                   )}
+                  {m.modelUsed && (
+                    <span className="text-[11px] text-zinc-400 dark:text-zinc-600">
+                      模型 {m.modelUsed}
+                    </span>
+                  )}
                   {m.content && <CopyButton content={m.content} />}
                 </div>
               )}

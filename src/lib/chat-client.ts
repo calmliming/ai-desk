@@ -40,6 +40,8 @@ export interface StreamHandlers {
   onUsage?: (usage: UsageStats) => void;
   /** 联网搜索引用来源更新时触发（携带累计列表） */
   onCitations?: (citations: Citation[]) => void;
+  /** 上游流中声明的实际模型名（首个数据帧触发） */
+  onModel?: (model: string) => void;
   onDone: () => void;
   onError: (message: string) => void;
 }
@@ -83,6 +85,7 @@ export async function streamChat(
   let buffer = "";
   const citations: Citation[] = [];
   const seenUrls = new Set<string>();
+  let modelReported = false;
 
   try {
     for (;;) {
@@ -101,6 +104,7 @@ export async function streamChat(
           if (!payload || payload === "[DONE]") continue;
           try {
             const json = JSON.parse(payload) as {
+              model?: string;
               choices?: {
                 delta?: {
                   content?: string;
@@ -122,6 +126,11 @@ export async function streamChat(
                 completionTokens: json.usage.completion_tokens ?? 0,
               });
               continue;
+            }
+            // 上游声明的实际模型名
+            if (!modelReported && typeof json.model === "string" && json.model) {
+              modelReported = true;
+              handlers.onModel?.(json.model);
             }
             const delta = json.choices?.[0]?.delta;
             if (!delta) continue;

@@ -38,5 +38,7 @@ export interface ChatMessage {
   usage?: { promptTokens: number; completionTokens: number };
   /** 联网搜索的引用来源（OpenAI web_search 返回） */
   citations?: Citation[];
+  /** 上游实际响应的模型名（用于核对真实模型） */
+  modelUsed?: string;
   createdAt: number;
 }
