@@ -23,7 +23,8 @@ interface ResultState {
   durationMs?: number;
   usage?: UsageStats;
   citations?: Citation[];
-  searchDropped?: boolean;
+  /** 联网搜索降级时的原因（存在即代表未生效） */
+  searchDropped?: string;
 }
 
 const EMPTY_RESULT: ResultState = { status: "pending", content: "", reasoning: "" };
@@ -136,10 +137,13 @@ export default function CompareApp() {
               [key]: { ...(prev[key] ?? EMPTY_RESULT), citations },
             }));
           },
-          onSearchDropped: () => {
+          onSearchDropped: (detail) => {
             setResults((prev) => ({
               ...prev,
-              [key]: { ...(prev[key] ?? EMPTY_RESULT), searchDropped: true },
+              [key]: {
+                ...(prev[key] ?? EMPTY_RESULT),
+                searchDropped: detail ?? "已按普通模式回答",
+              },
             }));
           },
           onDone: () => finishSlot(key, { status: "done" }),
@@ -445,6 +449,11 @@ function ResultCard({
         {result.searchDropped && (
           <p className="mb-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
             ⚠️ 该模型未启用联网搜索（已按普通模式回答）
+            {result.searchDropped !== "已按普通模式回答" && (
+              <span className="mt-1 block text-amber-600/80 dark:text-amber-400/80">
+                上游提示：{result.searchDropped}
+              </span>
+            )}
           </p>
         )}
         {result.citations && result.citations.length > 0 && (

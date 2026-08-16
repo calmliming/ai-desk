@@ -254,6 +254,21 @@ async function callAnthropicSearch(
   }
 }
 
+/** 提取上游错误文本（OpenAI 与 Anthropic 两种格式） */
+async function extractUpstreamError(resp: Response | null): Promise<string> {
+  if (!resp) return "网络请求失败";
+  try {
+    const raw = await resp.text();
+    const parsed = JSON.parse(raw) as {
+      error?: { message?: string };
+      message?: string;
+    };
+    return parsed.error?.message ?? parsed.message ?? raw.slice(0, 200);
+  } catch {
+    return `HTTP ${resp.status}`;
+  }
+}
+
 export async function POST(req: NextRequest) {
   let body: ChatRequestBody;
   try {
@@ -303,13 +318,17 @@ export async function POST(req: NextRequest) {
 
   let upstream: Response | null = null;
   let searchDropped = false;
+  let searchError = "";
 
   // DeepSeek 联网搜索：走 Anthropic 兼容端点
   if (body.search && body.providerId === "deepseek") {
-    upstream = await callAnthropicSearch(body, req.signal);
-    if (!upstream || !upstream.ok) {
+    const resp = await callAnthropicSearch(body, req.signal);
+    if (!resp || !resp.ok) {
       searchDropped = true;
+      searchError = await extractUpstreamError(resp);
       upstream = null;
+    } else {
+      upstream = resp;
     }
   }
 
@@ -344,8 +363,13 @@ export async function POST(req: NextRequest) {
     status: 200,
     headers: {
       ...SSE_HEADERS,
-      // 客户端据此提示「联网搜索未生效」
-      ...(searchDropped ? { "x-aidesk-search-dropped": "1" } : {}),
+      // 客户端据此提示「联网搜索未生效」及具体原因
+      ...(searchDropped
+        ? {
+            "x-aidesk-search-dropped": "1",
+            ...(searchError ? { "x-aidesk-search-error": encodeURIComponent(searchError) } : {}),
+          }
+        : {}),
     },
   });
 }

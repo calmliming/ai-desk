@@ -363,8 +363,10 @@ export default function ChatApp() {
             { persist: false },
           );
         },
-        onSearchDropped: () => {
-          setError("已开启联网搜索，但该提供商未接受搜索参数，本次已按普通模式回答。");
+        onSearchDropped: (detail) => {
+          setError(
+            `已开启联网搜索但未生效，已按普通模式回答。${detail ? `上游提示：${detail}` : ""}`,
+          );
         },
         onDone: () => {
           setStreaming(false);
