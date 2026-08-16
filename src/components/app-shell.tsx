@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { toggleTheme, useIsDark } from "@/lib/theme";
 import { toggleSidebar, useSidebarCollapsed } from "@/lib/ui-store";
+import Toaster from "@/components/ui/toaster";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import {
   IconChat,
   IconChevronsLeft,
@@ -181,6 +183,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <main className="min-w-0 flex-1 overflow-y-auto">
         <div className="w-full px-5 py-8 md:px-8 lg:px-10">{children}</div>
       </main>
+
+      {/* 全局弹窗组件 */}
+      <Toaster />
+      <ConfirmDialog />
     </div>
   );
 }

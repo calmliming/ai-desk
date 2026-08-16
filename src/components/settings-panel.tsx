@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { logActivity } from "@/lib/activity-store";
+import { toast } from "@/lib/toast-store";
 import { streamChat } from "@/lib/chat-client";
 import { IconCheck, IconEye, IconKey } from "./icons";
 import { CUSTOM_PROVIDER, PROVIDER_PRESETS } from "@/lib/providers";
@@ -12,7 +13,6 @@ export default function SettingsPanel() {
   const settings = useAppSettings();
   const [selectedId, setSelectedId] = useState<string>("deepseek");
   const [showKey, setShowKey] = useState(false);
-  const [savedFlash, setSavedFlash] = useState(false);
 
   const provider = settings.providers[selectedId];
   const isActive = settings.activeProviderId === selectedId;
@@ -34,8 +34,7 @@ export default function SettingsPanel() {
 
   const persist = (next: AppSettings) => {
     updateAppSettings(next);
-    setSavedFlash(true);
-    window.setTimeout(() => setSavedFlash(false), 1800);
+    toast.success("已保存到本机");
   };
 
   const handleSetActive = () => {
@@ -290,11 +289,6 @@ export default function SettingsPanel() {
           >
             恢复默认
           </button>
-          {savedFlash && (
-            <span className="ml-auto text-sm text-emerald-600 dark:text-emerald-400">
-              ✓ 已保存到本机
-            </span>
-          )}
         </div>
 
         {testResult && (

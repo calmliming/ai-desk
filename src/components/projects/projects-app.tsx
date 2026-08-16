@@ -40,6 +40,8 @@ import { useSessions } from "@/lib/sessions-store";
 import { useAppSettings } from "@/lib/settings-store";
 import { fillTemplate } from "@/lib/template-utils";
 import { setTransfer } from "@/lib/transfer";
+import { confirmDialog } from "@/lib/confirm-store";
+import { toast } from "@/lib/toast-store";
 import Select from "@/components/ui/select";
 import {
   IconArrowLeft,
@@ -123,11 +125,18 @@ export default function ProjectsApp() {
     logActivity("project", "新建项目", p.name);
   };
 
-  const handleDelete = (p: Project) => {
-    if (!window.confirm(`确定删除项目「${p.name}」？`)) return;
+  const handleDelete = async (p: Project) => {
+    const ok = await confirmDialog({
+      message: `确定删除项目「${p.name}」？`,
+      detail: "项目及其全部时间线记录将被删除，不可恢复。",
+      confirmLabel: "删除",
+      danger: true,
+    });
+    if (!ok) return;
     deleteProject(p.id);
     if (selectedId === p.id) setSelectedId(null);
     logActivity("project", "删除项目", p.name);
+    toast.success(`已删除「${p.name}」`);
   };
 
   const handleStage = (p: Project, stage: ProjectStage) => {

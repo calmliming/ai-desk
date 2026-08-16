@@ -10,6 +10,8 @@ import {
 } from "@/lib/prompts-store";
 import { extractVariables, fillTemplate } from "@/lib/template-utils";
 import { setTransfer } from "@/lib/transfer";
+import { confirmDialog } from "@/lib/confirm-store";
+import { toast } from "@/lib/toast-store";
 import Select from "@/components/ui/select";
 import {
   IconArrowRight,
@@ -75,12 +77,19 @@ export default function PromptsApp() {
     logActivity("prompt", "新建提示词");
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!prompt) return;
-    if (!window.confirm(`确定删除「${prompt.title}」？`)) return;
+    const ok = await confirmDialog({
+      message: `确定删除「${prompt.title}」？`,
+      detail: "删除后不可恢复。",
+      confirmLabel: "删除",
+      danger: true,
+    });
+    if (!ok) return;
     updatePrompts((prev) => prev.filter((p) => p.id !== prompt.id));
     setSelectedId(null);
     logActivity("prompt", "删除提示词", prompt.title);
+    toast.success(`已删除「${prompt.title}」`);
     setValues({});
   };
 
@@ -146,8 +155,9 @@ export default function PromptsApp() {
         setSelectedId(items[0].id);
         setValues({});
         logActivity("prompt", "导入提示词", `${items.length} 条`);
+        toast.success(`已导入 ${items.length} 条提示词`);
       } catch {
-        window.alert("导入失败：文件不是有效的 JSON，或缺少 title/content 字段。");
+        toast.error("导入失败：文件不是有效的 JSON，或缺少 title/content 字段。");
       }
     };
     reader.readAsText(file);

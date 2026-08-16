@@ -7,6 +7,8 @@ import {
   useActivity,
   type ActivityType,
 } from "@/lib/activity-store";
+import { confirmDialog } from "@/lib/confirm-store";
+import { toast } from "@/lib/toast-store";
 import { IconHistory, IconTrash } from "../icons";
 
 type Filter = ActivityType | "all";
@@ -41,9 +43,16 @@ export default function ActivityApp() {
 
   const filtered = filter === "all" ? activity : activity.filter((a) => a.type === filter);
 
-  const handleClear = () => {
-    if (!window.confirm("确定清空全部操作记录？此操作不可恢复。")) return;
+  const handleClear = async () => {
+    const ok = await confirmDialog({
+      message: "确定清空全部操作记录？",
+      detail: "此操作不可恢复。",
+      confirmLabel: "清空",
+      danger: true,
+    });
+    if (!ok) return;
     clearActivity();
+    toast.success("已清空操作记录");
   };
 
   return (
