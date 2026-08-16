@@ -42,6 +42,8 @@ export interface StreamHandlers {
   onCitations?: (citations: Citation[]) => void;
   /** 上游流中声明的实际模型名（首个数据帧触发） */
   onModel?: (model: string) => void;
+  /** 请求了联网搜索但被上游拒绝、已降级为普通回答时触发 */
+  onSearchDropped?: () => void;
   onDone: () => void;
   onError: (message: string) => void;
 }
@@ -78,6 +80,11 @@ export async function streamChat(
     }
     handlers.onError(message);
     return;
+  }
+
+  // 联网搜索参数被上游拒绝时的提示
+  if (res.headers.get("x-aidesk-search-dropped") === "1") {
+    handlers.onSearchDropped?.();
   }
 
   const reader = res.body.getReader();

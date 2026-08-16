@@ -363,6 +363,9 @@ export default function ChatApp() {
             { persist: false },
           );
         },
+        onSearchDropped: () => {
+          setError("已开启联网搜索，但该提供商未接受搜索参数，本次已按普通模式回答。");
+        },
         onDone: () => {
           setStreaming(false);
           finish();

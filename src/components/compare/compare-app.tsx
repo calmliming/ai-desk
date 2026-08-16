@@ -23,6 +23,7 @@ interface ResultState {
   durationMs?: number;
   usage?: UsageStats;
   citations?: Citation[];
+  searchDropped?: boolean;
 }
 
 const EMPTY_RESULT: ResultState = { status: "pending", content: "", reasoning: "" };
@@ -133,6 +134,12 @@ export default function CompareApp() {
             setResults((prev) => ({
               ...prev,
               [key]: { ...(prev[key] ?? EMPTY_RESULT), citations },
+            }));
+          },
+          onSearchDropped: () => {
+            setResults((prev) => ({
+              ...prev,
+              [key]: { ...(prev[key] ?? EMPTY_RESULT), searchDropped: true },
             }));
           },
           onDone: () => finishSlot(key, { status: "done" }),
@@ -435,6 +442,11 @@ function ResultCard({
             ))}
           </span>
         ) : null}
+        {result.searchDropped && (
+          <p className="mb-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+            ⚠️ 该模型未启用联网搜索（已按普通模式回答）
+          </p>
+        )}
         {result.citations && result.citations.length > 0 && (
           <div className="mt-3 space-y-0.5 border-t border-zinc-200 pt-2.5 dark:border-zinc-800">
             <p className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">📚 引用来源</p>
