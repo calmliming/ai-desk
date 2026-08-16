@@ -38,7 +38,7 @@ export interface ProjectMilestone {
   time: number;
 }
 
-export type ProjectLogKind = "created" | "stage" | "note";
+export type ProjectLogKind = "created" | "stage" | "note" | "ai";
 
 /** 项目日志（每次记录的时间节点） */
 export interface ProjectLog {
@@ -48,14 +48,30 @@ export interface ProjectLog {
   text: string;
 }
 
+/** 关联的外部条目快照 */
+export interface LinkedItem {
+  id: string;
+  title: string;
+}
+
 export interface Project {
   id: string;
   name: string;
   description?: string;
   stage: ProjectStage;
   milestones: ProjectMilestone[];
-  /** 逐条记录的时间节点（创建/阶段流转/手动记录） */
+  /** 逐条记录的时间节点（创建/阶段流转/手动记录/AI 产出） */
   logs: ProjectLog[];
+  /** 已归档（默认不显示在列表） */
+  archived?: boolean;
+  /** 阻塞标记 */
+  blocked?: boolean;
+  /** 截止日期（可选） */
+  deadline?: number;
+  /** 关联的对话会话 */
+  linkedSessions?: LinkedItem[];
+  /** 关联的提示词 */
+  linkedPrompts?: LinkedItem[];
   createdAt: number;
   updatedAt: number;
 }
@@ -167,8 +183,8 @@ export function setProjectStage(id: string, stage: ProjectStage): void {
   );
 }
 
-/** 手动添加一条项目记录（时间节点） */
-export function addProjectLog(id: string, text: string): void {
+/** 手动添加一条项目记录（时间节点），kind 缺省为 note */
+export function addProjectLog(id: string, text: string, kind: ProjectLogKind = "note"): void {
   const content = text.trim();
   if (!content) return;
   updateProjects((prev) =>
@@ -178,13 +194,147 @@ export function addProjectLog(id: string, text: string): void {
             ...p,
             logs: [
               ...p.logs,
-              { id: crypto.randomUUID(), time: Date.now(), kind: "note", text: content },
+              { id: crypto.randomUUID(), time: Date.now(), kind, text: content },
             ],
             updatedAt: Date.now(),
           }
         : p,
     ),
   );
+}
+
+export function toggleProjectArchived(id: string): void {
+  updateProjects((prev) =>
+    prev.map((p) =>
+      p.id === id ? { ...p, archived: !p.archived, updatedAt: Date.now() } : p,
+    ),
+  );
+}
+
+export function toggleProjectBlocked(id: string): void {
+  updateProjects((prev) =>
+    prev.map((p) => {
+      if (p.id !== id) return p;
+      const blocked = !p.blocked;
+      return {
+        ...p,
+        blocked,
+        updatedAt: Date.now(),
+        logs: [
+          ...p.logs,
+          {
+            id: crypto.randomUUID(),
+            time: Date.now(),
+            kind: "note" as const,
+            text: blocked ? "⚠️ 标记为阻塞" : "✅ 解除阻塞",
+          },
+        ],
+      };
+    }),
+  );
+}
+
+export function setProjectDeadline(id: string, deadline?: number): void {
+  updateProjects((prev) =>
+    prev.map((p) => (p.id === id ? { ...p, deadline, updatedAt: Date.now() } : p)),
+  );
+}
+
+export function linkProjectSession(id: string, item: LinkedItem): void {
+  updateProjects((prev) =>
+    prev.map((p) => {
+      if (p.id !== id) return p;
+      const list = p.linkedSessions ?? [];
+      if (list.some((x) => x.id === item.id)) return p;
+      return { ...p, linkedSessions: [...list, item], updatedAt: Date.now() };
+    }),
+  );
+}
+
+export function unlinkProjectSession(id: string, itemId: string): void {
+  updateProjects((prev) =>
+    prev.map((p) =>
+      p.id === id
+        ? {
+            ...p,
+            linkedSessions: (p.linkedSessions ?? []).filter((x) => x.id !== itemId),
+            updatedAt: Date.now(),
+          }
+        : p,
+    ),
+  );
+}
+
+export function linkProjectPrompt(id: string, item: LinkedItem): void {
+  updateProjects((prev) =>
+    prev.map((p) => {
+      if (p.id !== id) return p;
+      const list = p.linkedPrompts ?? [];
+      if (list.some((x) => x.id === item.id)) return p;
+      return { ...p, linkedPrompts: [...list, item], updatedAt: Date.now() };
+    }),
+  );
+}
+
+export function unlinkProjectPrompt(id: string, itemId: string): void {
+  updateProjects((prev) =>
+    prev.map((p) =>
+      p.id === id
+        ? {
+            ...p,
+            linkedPrompts: (p.linkedPrompts ?? []).filter((x) => x.id !== itemId),
+            updatedAt: Date.now(),
+          }
+        : p,
+    ),
+  );
+}
+
+/** 项目完成进度百分比（dev=33 / test=66 / live=100） */
+export function projectProgress(p: Project): number {
+  const idx = STAGE_ORDER.indexOf(p.stage);
+  return Math.round(((idx + 1) / STAGE_ORDER.length) * 100);
+}
+
+export interface ProjectsStats {
+  total: number;
+  active: number;
+  live: number;
+  archived: number;
+  blocked: number;
+  avgDevDays: number | null;
+  avgTestDays: number | null;
+  avgCycleDays: number | null;
+}
+
+/** 流程统计（平均周期基于全部项目计算） */
+export function projectsStats(projects: Project[]): ProjectsStats {
+  const devDays: number[] = [];
+  const testDays: number[] = [];
+  const cycles: number[] = [];
+  for (const p of projects) {
+    const d = stageDurationDays(p, "dev");
+    if (d !== null) devDays.push(d);
+    const t = stageDurationDays(p, "test");
+    if (t !== null) testDays.push(t);
+    const start = milestoneTime(p, "dev");
+    const live = milestoneTime(p, "live");
+    if (start && live) {
+      cycles.push(Math.max(Math.round((live - start) / 86_400_000), 1));
+    }
+  }
+  const avg = (arr: number[]): number | null =>
+    arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+  return {
+    total: projects.length,
+    active: projects.filter((p) => p.stage !== "live" && !p.archived).length,
+    live: projects.filter((p) => p.stage === "live").length,
+    archived: projects.filter((p) => p.archived).length,
+    blocked: projects.filter((p) => p.blocked).length,
+    avgDevDays: avg(devDays),
+    avgTestDays: avg(testDays),
+    avgCycleDays: avg(cycles),
+  };
 }
 
 /** 取某项目进入指定阶段的时间（未进入返回 null） */

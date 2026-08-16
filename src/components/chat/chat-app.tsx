@@ -53,6 +53,13 @@ export default function ChatApp() {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showParams, setShowParams] = useState(false);
+
+  // 从项目页等跳转过来时：自动选中指定会话（渲染期同步调整，避免水合不一致）
+  const [appliedSessionNonce, setAppliedSessionNonce] = useState(0);
+  if (transfer?.sessionId && transfer.nonce !== appliedSessionNonce) {
+    setAppliedSessionNonce(transfer.nonce);
+    setActiveId(transfer.sessionId);
+  }
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 

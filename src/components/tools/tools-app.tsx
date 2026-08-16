@@ -51,7 +51,7 @@ export default function ToolsApp() {
   const [appliedNonce, setAppliedNonce] = useState(0);
   if (transfer && transfer.nonce !== appliedNonce) {
     setAppliedNonce(transfer.nonce);
-    setInput(transfer.content);
+    setInput(transfer.content ?? "");
   }
 
   const switchTool = (t: TextTool) => {
