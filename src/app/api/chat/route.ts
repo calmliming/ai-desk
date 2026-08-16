@@ -75,6 +75,14 @@ function validate(body: ChatRequestBody): { ok: true } | { ok: false; message: s
   return { ok: true };
 }
 
+/** 注入当前时间，让模型准确回答时间类问题（无需搜索） */
+function timeSystemMessage(): { role: string; content: string } {
+  const now = new Date();
+  const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+  const content = `当前时间：${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（周${weekdays[now.getDay()]}）${now.toLocaleTimeString("zh-CN", { hour12: false })}（用户本地时区）。回答涉及“现在/今天/当前时间/星期几/日期”的问题时，请以这个时间为准，不要依赖网页内容。`;
+  return { role: "system", content };
+}
+
 /** 从多模态内容中提取纯文本（Anthropic 路径暂不支持图片） */
 function extractText(content: unknown): string {
   if (typeof content === "string") return content;
@@ -94,10 +102,13 @@ function buildAnthropicBody(body: ChatRequestBody): string {
   return JSON.stringify({
     model: body.model,
     max_tokens: typeof body.maxTokens === "number" && body.maxTokens > 0 ? body.maxTokens : 8192,
-    messages: (body.messages ?? []).map((m) => ({
-      role: m.role === "system" || m.role === "assistant" ? m.role : "user",
-      content: extractText(m.content),
-    })),
+    messages: [
+      timeSystemMessage(),
+      ...(body.messages ?? []).map((m) => ({
+        role: m.role === "system" || m.role === "assistant" ? m.role : "user",
+        content: extractText(m.content),
+      })),
+    ],
     tools: [{ type: "web_search_20250305", name: "web_search" }],
     tool_choice: { type: "auto" },
     thinking: { type: "disabled" },
@@ -288,7 +299,10 @@ export async function POST(req: NextRequest) {
   const buildUpstreamBody = (includeUsage: boolean, includeSearch: boolean) => {
     const upstreamBody: Record<string, unknown> = {
       model: body.model,
-      messages: body.messages!.map(({ role, content }) => ({ role, content })),
+      messages: [
+        timeSystemMessage(),
+        ...body.messages!.map(({ role, content }) => ({ role, content })),
+      ],
       stream: true,
     };
     if (includeUsage) upstreamBody.stream_options = { include_usage: true };
