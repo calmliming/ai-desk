@@ -39,6 +39,7 @@ export default function Composer({
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [attachBusy, setAttachBusy] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [menuIndex, setMenuIndex] = useState(0);
   const [menuSuppressed, setMenuSuppressed] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement | null>(null);
@@ -74,10 +75,15 @@ export default function Composer({
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    await processFiles(Array.from(files));
+  };
+
+  /** 统一的文件处理管线（选择器 / 粘贴 / 拖拽共用） */
+  const processFiles = async (files: File[]) => {
     setAttachBusy(true);
     setAttachError(null);
     const added: FileAttachment[] = [];
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       try {
         added.push(await parseAttachment(file));
       } catch (err) {
@@ -89,6 +95,32 @@ export default function Composer({
       logActivity("file", `添加附件（${added.length} 个）`, added.map((a) => a.name).join("、"));
     }
     setAttachBusy(false);
+  };
+
+  /** 粘贴：截图 / 复制的文件直接从剪贴板读取 */
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files: File[] = [];
+    for (const item of Array.from(items)) {
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) files.push(file);
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      void processFiles(files);
+    }
+  };
+
+  /** 拖拽上传 */
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    if (e.dataTransfer?.files?.length) {
+      void processFiles(Array.from(e.dataTransfer.files));
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -162,7 +194,19 @@ export default function Composer({
         </div>
       )}
 
-      <div className="relative flex items-end gap-2 rounded-2xl border border-zinc-300 bg-white p-2 transition-colors focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/20 dark:border-zinc-700 dark:bg-zinc-950/60">
+      <div
+        className={`relative flex items-end gap-2 rounded-2xl border bg-white p-2 transition-colors focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/20 dark:bg-zinc-950/60 ${
+          dragging
+            ? "border-amber-500 ring-2 ring-amber-500/30 dark:border-amber-400"
+            : "border-zinc-300 dark:border-zinc-700"
+        }`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+      >
         {menuOpen && suggestions.length > 0 && (
           <div className="absolute bottom-full left-0 right-0 z-10 mb-2 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
             <p className="border-b border-zinc-100 px-3 py-1.5 text-[11px] font-medium text-zinc-400 dark:border-zinc-800 dark:text-zinc-500">
@@ -222,6 +266,7 @@ export default function Composer({
             e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
           }}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={
             disabled && disabledHint
               ? disabledHint
@@ -254,7 +299,8 @@ export default function Composer({
         <p className="mt-1.5 px-1 text-xs text-red-500 dark:text-red-400">⚠️ {attachError}</p>
       )}
       <p className="mt-1.5 px-1 text-[11px] text-zinc-400 dark:text-zinc-600">
-        支持上传文本文件、PDF 与图片（图片需要视觉模型）；内容由 AI 生成，请注意甄别。
+        支持上传文本文件、PDF 与图片（图片需要视觉模型）；可直接粘贴截图或拖拽文件到输入框；内容由 AI
+        生成，请注意甄别。
       </p>
       </div>
     </div>
