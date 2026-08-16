@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { logActivity } from "@/lib/activity-store";
+import { streamChat } from "@/lib/chat-client";
 import { IconCheck, IconEye, IconKey } from "./icons";
 import { CUSTOM_PROVIDER, PROVIDER_PRESETS } from "@/lib/providers";
 import { updateAppSettings, useAppSettings } from "@/lib/settings-store";
@@ -16,6 +17,8 @@ export default function SettingsPanel() {
   const provider = settings.providers[selectedId];
   const isActive = settings.activeProviderId === selectedId;
   const modelNames = provider ? provider.models.join(", ") : "";
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   if (!provider) return null;
 
@@ -61,6 +64,71 @@ export default function SettingsPanel() {
         .map((m) => m.trim())
         .filter(Boolean),
     });
+  };
+
+  /** 用当前表单值发起一次最小对话，验证连接是否可用 */
+  const handleTest = async () => {
+    if (testing) return;
+    if (!provider.apiKey) {
+      setTestResult({ ok: false, message: "请先填写 API Key" });
+      return;
+    }
+    if (provider.models.length === 0 || !provider.models[0]) {
+      setTestResult({ ok: false, message: "请先填写模型列表" });
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    const controller = new AbortController();
+    const started = performance.now();
+    let reply = "";
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 15000);
+
+    const cleanup = () => window.clearTimeout(timeout);
+
+    await streamChat(
+      {
+        baseURL: provider.baseURL,
+        apiKey: provider.apiKey,
+        model: provider.models[0],
+        messages: [{ role: "user", content: "你好，请只回复：收到" }],
+      },
+      {
+        onDelta: (content) => {
+          reply += content;
+        },
+        onDone: () => {
+          cleanup();
+          setTesting(false);
+          const ok = !timedOut;
+          const elapsed = ((performance.now() - started) / 1000).toFixed(1);
+          setTestResult(
+            ok
+              ? {
+                  ok: true,
+                  message: `连接成功（${elapsed}s）${reply.trim() ? ` · 回复：「${reply.trim().slice(0, 30)}」` : ""}`,
+                }
+              : { ok: false, message: "连接超时（15 秒无响应）" },
+          );
+          logActivity(
+            "settings",
+            "测试提供商连接",
+            `${provider.name} · ${ok ? "成功" : "失败"}`,
+          );
+        },
+        onError: (message) => {
+          cleanup();
+          setTesting(false);
+          setTestResult({ ok: false, message });
+          logActivity("settings", "测试提供商连接", `${provider.name} · 失败`);
+        },
+      },
+      controller.signal,
+    );
   };
 
   return (
@@ -191,6 +259,21 @@ export default function SettingsPanel() {
             <IconCheck width={15} height={15} strokeWidth={2.6} />
             保存配置
           </button>
+          <button
+            type="button"
+            onClick={handleTest}
+            disabled={testing}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:border-amber-400 hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:text-amber-400"
+          >
+            {testing ? (
+              <>
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-300 border-t-orange-600" />
+                测试中…
+              </>
+            ) : (
+              "测试连接"
+            )}
+          </button>
           {!isActive && (
             <button
               type="button"
@@ -213,6 +296,18 @@ export default function SettingsPanel() {
             </span>
           )}
         </div>
+
+        {testResult && (
+          <p
+            className={`mt-3 rounded-lg px-3.5 py-2.5 text-sm ${
+              testResult.ok
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                : "bg-red-500/10 text-red-600 dark:text-red-400"
+            }`}
+          >
+            {testResult.ok ? "✅" : "⚠️"} {testResult.message}
+          </p>
+        )}
       </div>
     </div>
   );
