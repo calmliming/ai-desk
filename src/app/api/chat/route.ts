@@ -20,6 +20,7 @@ interface ChatRequestBody {
   temperature?: number;
   maxTokens?: number;
   search?: boolean;
+  thinking?: boolean;
   providerId?: string;
 }
 
@@ -45,6 +46,24 @@ function buildSearchParams(providerId: string | undefined): Record<string, unkno
       return { tools: [{ type: "web_search" }] };
     case "qwen":
       return { enable_search: true };
+    default:
+      return null;
+  }
+}
+
+/** 各提供商的思考模式参数（OpenAI 兼容接口写法） */
+function buildThinkingParams(
+  providerId: string | undefined,
+  enabled: boolean,
+): Record<string, unknown> | null {
+  switch (providerId) {
+    case "deepseek":
+      return { thinking: { type: enabled ? "enabled" : "disabled" } };
+    case "qwen":
+      return { enable_thinking: enabled };
+    case "openai":
+      // gpt-5 系列默认思考；关闭时用 reasoning_effort: none
+      return enabled ? null : { reasoning_effort: "none" };
     default:
       return null;
   }
@@ -111,7 +130,8 @@ function buildAnthropicBody(body: ChatRequestBody): string {
     ],
     tools: [{ type: "web_search_20250305", name: "web_search" }],
     tool_choice: { type: "auto" },
-    thinking: { type: "disabled" },
+    // 思考模式：默认开启（产生 thinking_delta 事件，翻译层会转为 reasoning_content）
+    thinking: { type: body.thinking === false ? "disabled" : "enabled" },
     stream: true,
   });
 }
@@ -158,7 +178,7 @@ export function translateAnthropicStream(
               const json = JSON.parse(data) as {
                 type?: string;
                 message?: { model?: string; usage?: { input_tokens?: number } };
-                delta?: { type?: string; text?: string };
+                delta?: { type?: string; text?: string; thinking?: string };
                 content_block?: {
                   type?: string;
                   content?: Array<{
@@ -202,6 +222,13 @@ export function translateAnthropicStream(
                     sseFrame({
                       model: modelName || undefined,
                       choices: [{ delta: { content: delta.text } }],
+                    }),
+                  );
+                } else if (delta?.type === "thinking_delta" && typeof delta.thinking === "string") {
+                  controller.enqueue(
+                    sseFrame({
+                      model: modelName || undefined,
+                      choices: [{ delta: { reasoning_content: delta.thinking } }],
                     }),
                   );
                 }
@@ -296,7 +323,11 @@ export async function POST(req: NextRequest) {
   const baseURL = body.baseURL!.replace(/\/+$/, "");
   const endpoint = `${baseURL}/chat/completions`;
 
-  const buildUpstreamBody = (includeUsage: boolean, includeSearch: boolean) => {
+  const buildUpstreamBody = (
+    includeUsage: boolean,
+    includeSearch: boolean,
+    includeThinking: boolean,
+  ) => {
     const upstreamBody: Record<string, unknown> = {
       model: body.model,
       messages: [
@@ -310,6 +341,10 @@ export async function POST(req: NextRequest) {
       const searchParams = buildSearchParams(body.providerId);
       if (searchParams) Object.assign(upstreamBody, searchParams);
     }
+    if (includeThinking && body.thinking !== undefined) {
+      const thinkingParams = buildThinkingParams(body.providerId, body.thinking);
+      if (thinkingParams) Object.assign(upstreamBody, thinkingParams);
+    }
     if (typeof body.temperature === "number" && Number.isFinite(body.temperature)) {
       upstreamBody.temperature = body.temperature;
     }
@@ -319,14 +354,14 @@ export async function POST(req: NextRequest) {
     return JSON.stringify(upstreamBody);
   };
 
-  const callUpstream = (includeUsage: boolean, includeSearch: boolean) =>
+  const callUpstream = (includeUsage: boolean, includeSearch: boolean, includeThinking: boolean) =>
     fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${body.apiKey}`,
       },
-      body: buildUpstreamBody(includeUsage, includeSearch),
+      body: buildUpstreamBody(includeUsage, includeSearch, includeThinking),
       signal: req.signal,
     });
 
@@ -349,12 +384,20 @@ export async function POST(req: NextRequest) {
   // 普通 OpenAI 兼容路径（OpenAI/Qwen 的搜索参数在此注入）
   if (!upstream) {
     const searchSupported = body.search === true && body.providerId !== "deepseek";
-    upstream = await callUpstream(true, searchSupported);
+    upstream = await callUpstream(true, searchSupported, true);
     if (!upstream.ok && RETRYABLE_STATUS.includes(upstream.status)) {
-      upstream = await callUpstream(false, searchSupported);
+      upstream = await callUpstream(false, searchSupported, true);
       if (!upstream.ok && RETRYABLE_STATUS.includes(upstream.status) && searchSupported) {
         searchDropped = true;
-        upstream = await callUpstream(false, false);
+        upstream = await callUpstream(false, false, true);
+      }
+      // 思考参数不受支持时最后兜底：按提供商默认模式请求
+      if (
+        !upstream.ok &&
+        RETRYABLE_STATUS.includes(upstream.status) &&
+        body.thinking !== undefined
+      ) {
+        upstream = await callUpstream(false, false, false);
       }
     }
   }

@@ -15,6 +15,8 @@ export interface Session {
   maxTokens?: number;
   /** 是否启用联网搜索（需提供商支持） */
   search?: boolean;
+  /** 思考模式：true=深度思考（默认），false=快速回答 */
+  thinking?: boolean;
   createdAt: number;
   updatedAt: number;
 }

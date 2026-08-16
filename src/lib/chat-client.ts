@@ -24,6 +24,8 @@ export interface ChatRequest {
   maxTokens?: number;
   /** 是否启用联网搜索（需提供商支持，不支持时自动降级） */
   search?: boolean;
+  /** 思考模式：true=深度思考，false=快速回答（provider 默认时可不传） */
+  thinking?: boolean;
   /** 提供商 id（用于注入对应搜索参数） */
   providerId?: string;
 }
@@ -125,6 +127,7 @@ export async function streamChat(
                 delta?: {
                   content?: string;
                   reasoning_content?: string;
+                  reasoning?: string;
                   annotations?: Array<{
                     type?: string;
                     url?: string;
@@ -162,7 +165,15 @@ export async function streamChat(
               }
               if (changed) handlers.onCitations?.(citations.map((c) => ({ ...c })));
             }
-            handlers.onDelta(delta.content ?? "", delta.reasoning_content ?? "");
+            // 思考过程：兼容 reasoning_content（DeepSeek/通义）与 reasoning（OpenAI 系）两种字段
+            handlers.onDelta(
+              delta.content ?? "",
+              typeof delta.reasoning_content === "string"
+                ? delta.reasoning_content
+                : typeof delta.reasoning === "string"
+                  ? delta.reasoning
+                  : "",
+            );
           } catch {
             // 忽略无法解析的帧
           }

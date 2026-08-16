@@ -13,7 +13,7 @@ import { useAppSettings } from "@/lib/settings-store";
 import { extractPreviewBlocks } from "@/lib/html-utils";
 import type { Citation } from "@/lib/types";
 import Select from "@/components/ui/select";
-import { IconCompare, IconCopy, IconGlobe, IconPlus, IconStop, IconX } from "../icons";
+import { IconCompare, IconCopy, IconGlobe, IconPlus, IconSparkle, IconStop, IconX } from "../icons";
 import HtmlPreview from "../chat/html-preview";
 import Markdown from "../chat/markdown";
 
@@ -39,6 +39,7 @@ export default function CompareApp() {
   const [results, setResults] = useState<Record<string, ResultState>>({});
   const [running, setRunning] = useState(false);
   const [search, setSearch] = useState(false);
+  const [thinking, setThinking] = useState(true);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const controllersRef = useRef<AbortController[]>([]);
 
@@ -114,6 +115,7 @@ export default function CompareApp() {
           model: slot.model,
           messages: [{ role: "user", content: q }],
           search,
+          thinking,
           providerId: slot.providerId,
         },
         {
@@ -285,6 +287,20 @@ export default function CompareApp() {
             <IconGlobe width={15} height={15} />
             联网
           </button>
+        <button
+          type="button"
+          onClick={() => setThinking((v) => !v)}
+          disabled={running}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+            thinking
+              ? "border-amber-500/60 bg-amber-500/15 text-orange-700 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-300"
+              : "border-zinc-300 text-zinc-600 hover:border-amber-400 hover:text-orange-600 dark:border-zinc-700 dark:text-zinc-300 dark:hover:text-amber-400"
+          }`}
+          title="思考模式（DeepSeek / 通义 / OpenAI 支持）"
+        >
+          <IconSparkle width={15} height={15} />
+          思考
+        </button>
         {running ? (
           <button
             type="button"

@@ -18,7 +18,7 @@ import {
 import type { ChatMessage } from "@/lib/types";
 import { clearTransfer, useTransfer } from "@/lib/transfer";
 import { buildToolMessage, parseSlashCommand } from "@/lib/tools";
-import { IconChat, IconDownload, IconGlobe, IconKey, IconSettings } from "../icons";
+import { IconChat, IconDownload, IconGlobe, IconKey, IconSettings, IconSparkle } from "../icons";
 import Select from "@/components/ui/select";
 import Composer from "./composer";
 import MessageList from "./message-list";
@@ -155,6 +155,17 @@ export default function ChatApp() {
     updateSessions((prev) =>
       prev.map((s) =>
         s.id === session.id ? { ...s, search: !s.search, updatedAt: timestamp() } : s,
+      ),
+    );
+  };
+
+  const handleThinkingToggle = () => {
+    if (!session) return;
+    updateSessions((prev) =>
+      prev.map((s) =>
+        s.id === session.id
+          ? { ...s, thinking: s.thinking === false, updatedAt: timestamp() }
+          : s,
       ),
     );
   };
@@ -331,6 +342,7 @@ export default function ChatApp() {
         temperature: target.temperature,
         maxTokens: target.maxTokens,
         search: target.search,
+        thinking: target.thinking !== false,
         providerId: target.providerId,
       },
       {
@@ -488,6 +500,20 @@ export default function ChatApp() {
         >
           <IconGlobe width={14} height={14} />
           联网
+        </button>
+        <button
+          type="button"
+          onClick={handleThinkingToggle}
+          disabled={!session}
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+            session?.thinking !== false
+              ? "border-amber-500/60 bg-amber-500/15 font-medium text-orange-700 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-300"
+              : "border-zinc-300 text-zinc-600 hover:border-amber-400 hover:text-orange-600 dark:border-zinc-700 dark:text-zinc-300 dark:hover:text-amber-400"
+          }`}
+          title="思考模式：开启后模型先深度思考再回答（DeepSeek / 通义 / OpenAI 支持，思考过程可展开查看）"
+        >
+          <IconSparkle width={14} height={14} />
+          思考
         </button>
 
         <div className="ml-auto flex items-center gap-2">
