@@ -239,9 +239,6 @@ export default function ProjectsApp() {
         ))}
       </div>
 
-      {/* 周期对比图 */}
-      <CycleChart projects={projects.filter((p) => !p.archived)} />
-
       {/* 搜索 / 排序 / 阶段筛选 / 归档 */}
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -691,6 +688,74 @@ function ProjectDetail({
         </button>
       </div>
 
+      {/* 快速记录（主角）：什么时间做了什么 */}
+      <form
+        className="mt-4 flex items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const text = logText.trim();
+          if (!text) return;
+          addProjectLog(p.id, text);
+          logActivity("project", "添加项目记录", `${p.name} · ${text.slice(0, 40)}`);
+          setLogText("");
+        }}
+      >
+        <input
+          type="text"
+          value={logText}
+          onChange={(e) => setLogText(e.target.value)}
+          placeholder="记录一下刚才做了什么，回车即记录…"
+          className={`${inputCls} !py-2.5 text-sm`}
+        />
+        <button
+          type="submit"
+          disabled={!logText.trim()}
+          className="shrink-0 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          记录
+        </button>
+      </form>
+
+      {/* 记录时间线（最新在前） */}
+      <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+        <p className="mb-2 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+          🕐 记录时间线（{p.logs.length} 条）
+        </p>
+        <div className="relative max-h-[420px] space-y-3 overflow-y-auto pl-1">
+          <span className="absolute bottom-1 left-[5px] top-1 w-px bg-zinc-200 dark:bg-zinc-700" />
+          {[...p.logs].reverse().map((log) => (
+            <div key={log.id} className="relative flex gap-3">
+              <span
+                className={`z-10 mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-zinc-50 dark:ring-zinc-950/40 ${
+                  log.kind === "stage"
+                    ? "bg-sky-500"
+                    : log.kind === "ai"
+                      ? "bg-rose-500"
+                      : log.kind === "note"
+                        ? "bg-orange-500"
+                        : "bg-amber-500"
+                }`}
+              />
+              <div className="min-w-0">
+                <p className="whitespace-pre-wrap text-xs leading-relaxed text-zinc-700 dark:text-zinc-200">
+                  {log.text}
+                </p>
+                <p className="text-[10px] tabular-nums text-zinc-400 dark:text-zinc-600">
+                  {formatDateTime(log.time)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 阶段与更多（折叠） */}
+      <details className="mt-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+        <summary className="cursor-pointer select-none text-xs font-medium text-zinc-500 transition-colors hover:text-orange-600 dark:text-zinc-400 dark:hover:text-amber-400">
+          ⚙️ 阶段与更多（开发/测试/上线 · 任务 · AI · 关联）
+        </summary>
+        <div className="mt-3 space-y-3">
+
       {/* 进度 */}
       <div className="flex items-center gap-2">
         <div className="h-1.5 flex-1 rounded-full bg-zinc-200 dark:bg-zinc-800">
@@ -919,65 +984,6 @@ function ProjectDetail({
         </span>
       </div>
 
-      {/* 日志时间线 */}
-      <div className="rounded-xl border border-zinc-200 bg-zinc-50/60 p-3 dark:border-zinc-800 dark:bg-zinc-950/40">
-        <p className="mb-2 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
-          🕐 记录时间线（{p.logs.length} 条）
-        </p>
-        <div className="relative max-h-72 space-y-3 overflow-y-auto pl-1">
-          <span className="absolute bottom-1 left-[5px] top-1 w-px bg-zinc-200 dark:bg-zinc-700" />
-          {p.logs.map((log) => (
-            <div key={log.id} className="relative flex gap-3">
-              <span
-                className={`z-10 mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-zinc-50 dark:ring-zinc-950/40 ${
-                  log.kind === "stage"
-                    ? "bg-sky-500"
-                    : log.kind === "ai"
-                      ? "bg-rose-500"
-                      : log.kind === "note"
-                        ? "bg-orange-500"
-                        : "bg-amber-500"
-                }`}
-              />
-              <div className="min-w-0">
-                <p className="whitespace-pre-wrap text-xs leading-relaxed text-zinc-700 dark:text-zinc-200">
-                  {log.text}
-                </p>
-                <p className="text-[10px] tabular-nums text-zinc-400 dark:text-zinc-600">
-                  {formatDateTime(log.time)}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <form
-          className="mt-3 flex items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const text = logText.trim();
-            if (!text) return;
-            addProjectLog(p.id, text);
-            logActivity("project", "添加项目记录", `${p.name} · ${text.slice(0, 40)}`);
-            setLogText("");
-          }}
-        >
-          <input
-            type="text"
-            value={logText}
-            onChange={(e) => setLogText(e.target.value)}
-            placeholder="添加一条记录，如：修复了登录 bug…"
-            className={`${inputCls} !py-1.5 text-xs`}
-          />
-          <button
-            type="submit"
-            disabled={!logText.trim()}
-            className="shrink-0 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            记录
-          </button>
-        </form>
-      </div>
-
       {/* AI 助手 */}
       <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
         <p className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
@@ -1153,61 +1159,8 @@ function ProjectDetail({
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-/** 周期对比图：每个项目开发(琥珀)+测试(天蓝)历时堆叠条 */
-function CycleChart({ projects }: { projects: Project[] }) {
-  const rows = projects
-    .map((p) => {
-      const dev = stageDurationDays(p, "dev") ?? 0;
-      const test = stageDurationDays(p, "test") ?? 0;
-      return { p, dev, test, total: dev + test };
-    })
-    .filter((r) => r.total > 0);
-
-  if (rows.length === 0) return null;
-  const max = Math.max(...rows.map((r) => r.total), 1);
-
-  return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 dark:shadow-none">
-      <p className="mb-3 text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-        📊 周期对比（开发 + 测试，天）
-      </p>
-      <div className="space-y-2">
-        {rows.map(({ p, dev, test, total }) => (
-          <div key={p.id} className="flex items-center gap-3">
-            <span className="w-36 shrink-0 truncate text-xs text-zinc-600 dark:text-zinc-300" title={p.name}>
-              {p.blocked ? "⚠️ " : ""}
-              {p.name}
-            </span>
-            <div className="flex h-4 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-              <div
-                className="h-full bg-gradient-to-r from-amber-500 to-amber-400"
-                style={{ width: `${(dev / max) * 100}%` }}
-                title={`开发 ${dev} 天`}
-              />
-              <div
-                className="h-full bg-sky-500/80"
-                style={{ width: `${(test / max) * 100}%` }}
-                title={`测试 ${test} 天`}
-              />
-            </div>
-            <span className="w-12 shrink-0 text-right text-[10px] tabular-nums text-zinc-400">
-              {total} 天
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 flex gap-4 text-[10px] text-zinc-400">
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-amber-500" /> 开发
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-sky-500" /> 测试
-        </span>
-      </div>
+        </div>
+      </details>
     </div>
   );
 }
