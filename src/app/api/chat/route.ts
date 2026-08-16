@@ -15,9 +15,31 @@ interface ChatRequestBody {
   stream?: boolean;
   temperature?: number;
   maxTokens?: number;
+  search?: boolean;
+  providerId?: string;
 }
 
 const ALLOWED_PROTOCOLS = ["https:", "http:"];
+const RETRYABLE_STATUS = [400, 404, 415, 422];
+
+/**
+ * 各提供商的联网搜索参数（均为官方原生搜索，无需额外 API Key）。
+ * 返回 null 表示该提供商没有已知的搜索参数写法。
+ */
+function buildSearchParams(providerId: string | undefined): Record<string, unknown> | null {
+  switch (providerId) {
+    case "openai":
+      return { tools: [{ type: "web_search" }] };
+    case "deepseek":
+      return {
+        tools: [{ type: "builtin", function: { name: "web_search_20250305" } }],
+      };
+    case "qwen":
+      return { enable_search: true };
+    default:
+      return null;
+  }
+}
 
 function validate(body: ChatRequestBody): { ok: true } | { ok: false; message: string } {
   if (!body.baseURL || typeof body.baseURL !== "string") {
@@ -60,7 +82,7 @@ export async function POST(req: NextRequest) {
   const baseURL = body.baseURL!.replace(/\/+$/, "");
   const endpoint = `${baseURL}/chat/completions`;
 
-  const buildUpstreamBody = (includeUsage: boolean) => {
+  const buildUpstreamBody = (includeUsage: boolean, includeSearch: boolean) => {
     const upstreamBody: Record<string, unknown> = {
       model: body.model,
       messages: body.messages!.map(({ role, content }) => ({ role, content })),
@@ -68,6 +90,11 @@ export async function POST(req: NextRequest) {
     };
     // 请求 usage 统计（部分提供商不支持该参数，失败时回退重试）
     if (includeUsage) upstreamBody.stream_options = { include_usage: true };
+    // 联网搜索参数（按提供商注入；不支持时降级为普通请求）
+    if (includeSearch && body.search) {
+      const searchParams = buildSearchParams(body.providerId);
+      if (searchParams) Object.assign(upstreamBody, searchParams);
+    }
     if (typeof body.temperature === "number" && Number.isFinite(body.temperature)) {
       upstreamBody.temperature = body.temperature;
     }
@@ -77,22 +104,26 @@ export async function POST(req: NextRequest) {
     return JSON.stringify(upstreamBody);
   };
 
-  const callUpstream = (includeUsage: boolean) =>
+  const callUpstream = (includeUsage: boolean, includeSearch: boolean) =>
     fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${body.apiKey}`,
       },
-      body: buildUpstreamBody(includeUsage),
+      body: buildUpstreamBody(includeUsage, includeSearch),
       // 浏览器断开时中止上游请求
       signal: req.signal,
     });
 
-  let upstream = await callUpstream(true);
-  // 400/404/422/415 可能是 stream_options 不受支持：去掉后重试一次
-  if (!upstream.ok && [400, 404, 415, 422].includes(upstream.status)) {
-    upstream = await callUpstream(false);
+  let upstream = await callUpstream(true, true);
+  // 400/404/422/415 可能是 stream_options 不受支持：去掉后重试
+  if (!upstream.ok && RETRYABLE_STATUS.includes(upstream.status)) {
+    upstream = await callUpstream(false, true);
+    // 仍失败可能是搜索参数不受支持：再降级为普通请求
+    if (!upstream.ok && RETRYABLE_STATUS.includes(upstream.status)) {
+      upstream = await callUpstream(false, false);
+    }
   }
 
   if (!upstream.ok || !upstream.body) {

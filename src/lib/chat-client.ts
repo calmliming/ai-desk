@@ -20,6 +20,10 @@ export interface ChatRequest {
   temperature?: number;
   /** 最大输出 token 数（>0 时生效） */
   maxTokens?: number;
+  /** 是否启用联网搜索（需提供商支持，不支持时自动降级） */
+  search?: boolean;
+  /** 提供商 id（用于注入对应搜索参数） */
+  providerId?: string;
 }
 
 export interface UsageStats {

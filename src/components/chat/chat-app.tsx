@@ -18,7 +18,7 @@ import {
 import type { ChatMessage } from "@/lib/types";
 import { clearTransfer, useTransfer } from "@/lib/transfer";
 import { buildToolMessage, parseSlashCommand } from "@/lib/tools";
-import { IconChat, IconDownload, IconKey, IconSettings } from "../icons";
+import { IconChat, IconDownload, IconGlobe, IconKey, IconSettings } from "../icons";
 import Select from "@/components/ui/select";
 import Composer from "./composer";
 import MessageList from "./message-list";
@@ -139,6 +139,15 @@ export default function ChatApp() {
     updateSessions((prev) =>
       prev.map((s) =>
         s.id === session.id ? { ...s, ...patch, updatedAt: timestamp() } : s,
+      ),
+    );
+  };
+
+  const handleSearchToggle = () => {
+    if (!session) return;
+    updateSessions((prev) =>
+      prev.map((s) =>
+        s.id === session.id ? { ...s, search: !s.search, updatedAt: timestamp() } : s,
       ),
     );
   };
@@ -278,6 +287,8 @@ export default function ChatApp() {
         messages: requestMessages,
         temperature: target.temperature,
         maxTokens: target.maxTokens,
+        search: target.search,
+        providerId: target.providerId,
       },
       {
         onDelta: (content, reasoning) => {
@@ -394,6 +405,20 @@ export default function ChatApp() {
         >
           <IconSettings width={14} height={14} />
           参数
+        </button>
+        <button
+          type="button"
+          onClick={handleSearchToggle}
+          disabled={!session}
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+            session?.search
+              ? "border-amber-500/60 bg-amber-500/15 font-medium text-orange-700 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-300"
+              : "border-zinc-300 text-zinc-600 hover:border-amber-400 hover:text-orange-600 dark:border-zinc-700 dark:text-zinc-300 dark:hover:text-amber-400"
+          }`}
+          title="联网搜索：让模型先检索网络再回答（需提供商支持）"
+        >
+          <IconGlobe width={14} height={14} />
+          联网
         </button>
 
         <div className="ml-auto flex items-center gap-2">

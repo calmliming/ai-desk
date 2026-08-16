@@ -13,6 +13,8 @@ export interface Session {
   temperature?: number;
   /** 最大输出 token 数（0/未设置 = 不限） */
   maxTokens?: number;
+  /** 是否启用联网搜索（需提供商支持） */
+  search?: boolean;
   createdAt: number;
   updatedAt: number;
 }

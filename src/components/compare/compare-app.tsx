@@ -11,7 +11,7 @@ import {
 } from "@/lib/compare-store";
 import { useAppSettings } from "@/lib/settings-store";
 import Select from "@/components/ui/select";
-import { IconCompare, IconCopy, IconPlus, IconStop, IconX } from "../icons";
+import { IconCompare, IconCopy, IconGlobe, IconPlus, IconStop, IconX } from "../icons";
 import Markdown from "../chat/markdown";
 
 interface ResultState {
@@ -32,6 +32,7 @@ export default function CompareApp() {
   const [question, setQuestion] = useState("");
   const [results, setResults] = useState<Record<string, ResultState>>({});
   const [running, setRunning] = useState(false);
+  const [search, setSearch] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const controllersRef = useRef<AbortController[]>([]);
 
@@ -106,6 +107,8 @@ export default function CompareApp() {
           apiKey: provider.apiKey,
           model: slot.model,
           messages: [{ role: "user", content: q }],
+          search,
+          providerId: slot.providerId,
         },
         {
           onDelta: (content, reasoning) => {
@@ -247,6 +250,20 @@ export default function CompareApp() {
           }}
           className="max-h-[140px] min-h-[40px] flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-relaxed outline-none placeholder:text-zinc-400"
         />
+        <button
+          type="button"
+          onClick={() => setSearch((v) => !v)}
+            disabled={running}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              search
+                ? "border-amber-500/60 bg-amber-500/15 text-orange-700 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-300"
+                : "border-zinc-300 text-zinc-600 hover:border-amber-400 hover:text-orange-600 dark:border-zinc-700 dark:text-zinc-300 dark:hover:text-amber-400"
+            }`}
+            title="联网搜索（需提供商支持）"
+          >
+            <IconGlobe width={15} height={15} />
+            联网
+          </button>
         {running ? (
           <button
             type="button"
