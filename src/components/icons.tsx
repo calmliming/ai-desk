@@ -241,3 +241,19 @@ export function IconHistory(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function IconChevronsLeft(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="m11 7-5 5 5 5M18 7l-5 5 5 5" />
+    </svg>
+  );
+}
+
+export function IconChevronsRight(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="m13 7 5 5-5 5M6 7l5 5-5 5" />
+    </svg>
+  );
+}
