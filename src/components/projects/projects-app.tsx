@@ -42,6 +42,7 @@ import { fillTemplate } from "@/lib/template-utils";
 import { setTransfer } from "@/lib/transfer";
 import { confirmDialog } from "@/lib/confirm-store";
 import { toast } from "@/lib/toast-store";
+import Modal from "@/components/ui/modal";
 import Select from "@/components/ui/select";
 import {
   IconArrowLeft,
@@ -88,6 +89,10 @@ export default function ProjectsApp() {
   const [showArchived, setShowArchived] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<ProjectStage | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const [newDeadline, setNewDeadline] = useState("");
 
   const stats = projectsStats(projects);
 
@@ -120,9 +125,10 @@ export default function ProjectsApp() {
   const selected = projects.find((p) => p.id === effectiveId) ?? null;
 
   const handleNew = () => {
-    const p = createProject("新项目", "");
-    setSelectedId(p.id);
-    logActivity("project", "新建项目", p.name);
+    setNewName("");
+    setNewDesc("");
+    setNewDeadline("");
+    setNewOpen(true);
   };
 
   const handleDelete = async (p: Project) => {
@@ -342,6 +348,57 @@ export default function ProjectsApp() {
           </div>
         </div>
       )}
+
+      {/* 新建项目弹窗表单 */}
+      <Modal
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        title="新建项目"
+        description="填写项目基本信息，创建后进入开发阶段。"
+        confirmLabel="创建"
+        confirmDisabled={!newName.trim()}
+        onConfirm={() => {
+          const p = createProject(newName.trim(), newDesc.trim() || undefined);
+          if (newDeadline) setProjectDeadline(p.id, new Date(newDeadline).getTime());
+          setSelectedId(p.id);
+          setNewOpen(false);
+          logActivity("project", "新建项目", p.name);
+          toast.success(`已创建项目「${p.name}」`);
+        }}
+      >
+        <div className="space-y-4">
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium">项目名称</span>
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className={inputCls}
+              placeholder="如：AI 工作台"
+              autoFocus
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium">描述（可选）</span>
+            <textarea
+              rows={3}
+              value={newDesc}
+              onChange={(e) => setNewDesc(e.target.value)}
+              className={`${inputCls} resize-none`}
+              placeholder="这个项目是做什么的…"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium">截止日期（可选）</span>
+            <input
+              type="date"
+              value={newDeadline}
+              onChange={(e) => setNewDeadline(e.target.value)}
+              className={inputCls}
+            />
+          </label>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { extractVariables, fillTemplate } from "@/lib/template-utils";
 import { setTransfer } from "@/lib/transfer";
 import { confirmDialog } from "@/lib/confirm-store";
 import { toast } from "@/lib/toast-store";
+import Modal from "@/components/ui/modal";
 import Select from "@/components/ui/select";
 import {
   IconArrowRight,
@@ -39,6 +40,9 @@ export default function PromptsApp() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newContent, setNewContent] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const effectiveId = selectedId ?? prompts[0]?.id ?? null;
@@ -63,18 +67,9 @@ export default function PromptsApp() {
   };
 
   const handleNew = () => {
-    const now = Date.now();
-    const p: PromptTemplate = {
-      id: uid(),
-      title: "未命名提示词",
-      content: "",
-      createdAt: now,
-      updatedAt: now,
-    };
-    updatePrompts((prev) => [p, ...prev]);
-    setSelectedId(p.id);
-    setValues({});
-    logActivity("prompt", "新建提示词");
+    setNewTitle("");
+    setNewContent("");
+    setNewOpen(true);
   };
 
   const handleDelete = async () => {
@@ -376,6 +371,56 @@ export default function PromptsApp() {
           </div>
         )}
       </div>
+
+      {/* 新建提示词弹窗表单 */}
+      <Modal
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        title="新建提示词"
+        description="支持 {{变量}} 占位符，使用时自动生成填写表单。"
+        confirmLabel="创建"
+        confirmDisabled={!newTitle.trim()}
+        onConfirm={() => {
+          const now = Date.now();
+          const p: PromptTemplate = {
+            id: uid(),
+            title: newTitle.trim(),
+            content: newContent,
+            createdAt: now,
+            updatedAt: now,
+          };
+          updatePrompts((prev) => [p, ...prev]);
+          setSelectedId(p.id);
+          setValues({});
+          setNewOpen(false);
+          logActivity("prompt", "新建提示词", p.title);
+          toast.success(`已创建「${p.title}」`);
+        }}
+      >
+        <div className="space-y-4">
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium">标题</span>
+            <input
+              type="text"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              className={inputCls}
+              placeholder="如：周报生成"
+              autoFocus
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium">提示词内容</span>
+            <textarea
+              rows={6}
+              value={newContent}
+              onChange={(e) => setNewContent(e.target.value)}
+              className={`${inputCls} resize-none font-mono text-[13px]`}
+              placeholder={"将以下内容翻译成{{目标语言}}：\n{{内容}}"}
+            />
+          </label>
+        </div>
+      </Modal>
     </div>
   );
 }
