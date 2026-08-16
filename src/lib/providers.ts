@@ -25,7 +25,7 @@ export const PROVIDER_PRESETS: ProviderConfig[] = [
     name: "Moonshot · Kimi",
     baseURL: "https://api.moonshot.cn/v1",
     apiKey: "",
-    models: ["kimi-k2.6", "kimi-k2.7-code"],
+    models: ["kimi-k3", "kimi-k2.7-code"],
     builtin: true,
   },
   {
@@ -34,10 +34,10 @@ export const PROVIDER_PRESETS: ProviderConfig[] = [
     baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     apiKey: "",
     models: [
-      "qwen-max",
+      "qwen3.8-max",
       "qwen3.7-max",
-      "qwen-plus",
       "qwen3.7-plus",
+      "qwen-max",
       "qwen-vl-max",
       "qwen-vl-plus",
     ],
@@ -63,10 +63,12 @@ const OUTDATED_MODEL_LISTS: Record<string, string[][]> = {
   moonshot: [
     ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
     ["kimi-k2.6"],
+    ["kimi-k2.6", "kimi-k2.7-code"],
   ],
   qwen: [
     ["qwen-turbo", "qwen-plus", "qwen-max"],
     ["qwen-max", "qwen-plus", "qwen-turbo", "qwen-vl-max", "qwen-vl-plus"],
+    ["qwen-max", "qwen3.7-max", "qwen-plus", "qwen3.7-plus", "qwen-vl-max", "qwen-vl-plus"],
   ],
 };
 
