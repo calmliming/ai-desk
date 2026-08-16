@@ -22,8 +22,8 @@ export interface Session {
 const SESSIONS_KEY = "aidesk.sessions.v1";
 const SERVER_SNAPSHOT: Session[] = [];
 
-/** 已停用模型 → 现行替代模型（加载旧会话时自动迁移） */
-const RETIRED_MODELS: Record<string, string> = {
+/** 已停用模型 → 现行替代模型（加载旧会话/对比槽位时自动迁移） */
+export const RETIRED_MODELS: Record<string, string> = {
   "deepseek-chat": "deepseek-v4-flash",
   "deepseek-reasoner": "deepseek-v4-pro",
   "gpt-4o": "gpt-5",

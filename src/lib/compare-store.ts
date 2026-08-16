@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { RETIRED_MODELS } from "./sessions-store";
 
 /** 参与对比的一个模型槽位 */
 export interface CompareSlot {
@@ -21,9 +22,11 @@ function load(): CompareSlot[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return (parsed as CompareSlot[]).filter(
-      (s) => typeof s.providerId === "string" && typeof s.model === "string",
-    );
+    return (parsed as CompareSlot[])
+      .filter((s) => typeof s.providerId === "string" && typeof s.model === "string")
+      .map((s) =>
+        RETIRED_MODELS[s.model] ? { ...s, model: RETIRED_MODELS[s.model] } : s,
+      );
   } catch {
     return [];
   }

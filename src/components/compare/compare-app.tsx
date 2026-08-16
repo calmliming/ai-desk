@@ -340,7 +340,7 @@ export default function CompareApp() {
                 </button>
               )}
             </div>
-            <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {slots.map((s) => {
                 const key = slotKey(s);
                 const r = results[key] ?? EMPTY_RESULT;
@@ -425,7 +425,7 @@ function ResultCard({
           </button>
         )}
       </header>
-      <div className="min-h-[8rem] flex-1 p-4">
+      <div className="min-h-[8rem] max-h-[560px] flex-1 overflow-y-auto p-4">
         {result.status === "pending" && (
           <div className="flex h-full min-h-[6rem] items-center justify-center">
             <span className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-200 border-t-amber-500" />
