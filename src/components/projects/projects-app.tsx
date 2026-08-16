@@ -3,6 +3,7 @@
 import { Fragment, useState } from "react";
 import { logActivity } from "@/lib/activity-store";
 import {
+  addProjectLog,
   createProject,
   deleteProject,
   milestoneTime,
@@ -24,6 +25,13 @@ function formatDate(ts: number | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
   return `${d.getMonth() + 1}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatDateTime(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, "0")}:${String(
+    d.getMinutes(),
+  ).padStart(2, "0")}`;
 }
 
 export default function ProjectsApp() {
@@ -136,6 +144,8 @@ function ProjectCard({
 }) {
   const meta = STAGE_META[p.stage];
   const stageIdx = STAGE_ORDER.indexOf(p.stage);
+  const [showLogs, setShowLogs] = useState(false);
+  const [logText, setLogText] = useState("");
 
   return (
     <div className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 dark:shadow-none">
@@ -232,6 +242,18 @@ function ProjectCard({
         <span className="text-[11px] text-zinc-400 dark:text-zinc-600">
           当前阶段已 {stageDurationDays(p, p.stage) ?? 1} 天
         </span>
+        <button
+          type="button"
+          onClick={() => setShowLogs((v) => !v)}
+          className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+            showLogs
+              ? "border-amber-500/50 text-orange-600 dark:text-amber-400"
+              : "border-zinc-300 text-zinc-600 hover:border-amber-400 hover:text-orange-600 dark:border-zinc-700 dark:text-zinc-300 dark:hover:text-amber-400"
+          }`}
+          title="查看/添加时间节点记录"
+        >
+          🕐 时间线（{p.logs.length}）
+        </button>
         <span className="ml-auto flex items-center gap-1.5">
           {stageIdx > 0 && (
             <button
@@ -260,6 +282,62 @@ function ProjectCard({
           )}
         </span>
       </div>
+
+      {/* 日志时间线（每次记录的时间节点） */}
+      {showLogs && (
+        <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3 dark:border-zinc-800 dark:bg-zinc-950/40">
+          <div className="relative max-h-56 space-y-3 overflow-y-auto pl-1">
+            <span className="absolute bottom-1 left-[5px] top-1 w-px bg-zinc-200 dark:bg-zinc-700" />
+            {p.logs.map((log) => (
+              <div key={log.id} className="relative flex gap-3">
+                <span
+                  className={`z-10 mt-1 h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-zinc-50 dark:ring-zinc-950/40 ${
+                    log.kind === "stage"
+                      ? "bg-sky-500"
+                      : log.kind === "note"
+                        ? "bg-orange-500"
+                        : "bg-amber-500"
+                  }`}
+                />
+                <div className="min-w-0">
+                  <p className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-200">
+                    {log.text}
+                  </p>
+                  <p className="text-[10px] tabular-nums text-zinc-400 dark:text-zinc-600">
+                    {formatDateTime(log.time)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <form
+            className="mt-3 flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const text = logText.trim();
+              if (!text) return;
+              addProjectLog(p.id, text);
+              logActivity("project", "添加项目记录", `${p.name} · ${text.slice(0, 40)}`);
+              setLogText("");
+            }}
+          >
+            <input
+              type="text"
+              value={logText}
+              onChange={(e) => setLogText(e.target.value)}
+              placeholder="添加一条记录，如：修复了登录 bug…"
+              className={`${inputCls} !py-1.5 text-xs`}
+            />
+            <button
+              type="submit"
+              disabled={!logText.trim()}
+              className="shrink-0 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              记录
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

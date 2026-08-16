@@ -38,12 +38,24 @@ export interface ProjectMilestone {
   time: number;
 }
 
+export type ProjectLogKind = "created" | "stage" | "note";
+
+/** 项目日志（每次记录的时间节点） */
+export interface ProjectLog {
+  id: string;
+  time: number;
+  kind: ProjectLogKind;
+  text: string;
+}
+
 export interface Project {
   id: string;
   name: string;
   description?: string;
   stage: ProjectStage;
   milestones: ProjectMilestone[];
+  /** 逐条记录的时间节点（创建/阶段流转/手动记录） */
+  logs: ProjectLog[];
   createdAt: number;
   updatedAt: number;
 }
@@ -54,13 +66,30 @@ const SERVER_SNAPSHOT: Project[] = [];
 let current: Project[] | null = null;
 const listeners = new Set<() => void>();
 
+/** 旧数据兼容：没有 logs 字段的项目按里程碑回填 */
+function backfillLogs(p: Project): Project {
+  if (Array.isArray(p.logs)) return p;
+  const logs: ProjectLog[] = [
+    { id: `${p.id}-created`, time: p.createdAt, kind: "created", text: "创建项目" },
+  ];
+  for (const m of p.milestones.slice(1)) {
+    logs.push({
+      id: `${p.id}-${m.stage}-${m.time}`,
+      time: m.time,
+      kind: "stage",
+      text: `进入${STAGE_META[m.stage].label}`,
+    });
+  }
+  return { ...p, logs };
+}
+
 function load(): Project[] {
   if (typeof window === "undefined") return SERVER_SNAPSHOT;
   try {
     const raw = window.localStorage.getItem(PROJECTS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as Project[]) : [];
+    return Array.isArray(parsed) ? (parsed as Project[]).map(backfillLogs) : [];
   } catch {
     return [];
   }
@@ -105,6 +134,7 @@ export function createProject(name: string, description?: string): Project {
     description,
     stage: "dev",
     milestones: [{ stage: "dev", time: now }],
+    logs: [{ id: crypto.randomUUID(), time: now, kind: "created", text: "创建项目" }],
     createdAt: now,
     updatedAt: now,
   };
@@ -116,19 +146,44 @@ export function deleteProject(id: string): void {
   updateProjects((prev) => prev.filter((p) => p.id !== id));
 }
 
-/** 切换阶段并记录里程碑 */
+/** 切换阶段并记录里程碑 + 日志节点 */
 export function setProjectStage(id: string, stage: ProjectStage): void {
   updateProjects((prev) =>
     prev.map((p) => {
       if (p.id !== id || p.stage === stage) return p;
+      const now = Date.now();
       const next: Project = {
         ...p,
         stage,
-        milestones: [...p.milestones, { stage, time: Date.now() }],
-        updatedAt: Date.now(),
+        milestones: [...p.milestones, { stage, time: now }],
+        logs: [
+          ...p.logs,
+          { id: crypto.randomUUID(), time: now, kind: "stage", text: `进入${STAGE_META[stage].label}` },
+        ],
+        updatedAt: now,
       };
       return next;
     }),
+  );
+}
+
+/** 手动添加一条项目记录（时间节点） */
+export function addProjectLog(id: string, text: string): void {
+  const content = text.trim();
+  if (!content) return;
+  updateProjects((prev) =>
+    prev.map((p) =>
+      p.id === id
+        ? {
+            ...p,
+            logs: [
+              ...p.logs,
+              { id: crypto.randomUUID(), time: Date.now(), kind: "note", text: content },
+            ],
+            updatedAt: Date.now(),
+          }
+        : p,
+    ),
   );
 }
 
