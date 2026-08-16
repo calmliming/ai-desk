@@ -26,14 +26,30 @@ function formatDateTime(ts: number): string {
   ).padStart(2, "0")}`;
 }
 
+/** 时间戳（模块级封装） */
+function now(): number {
+  return Date.now();
+}
+
+/** 时间戳 → datetime-local 输入值（本地时区，精确到分钟） */
+function toDateTimeLocal(ts: number): string {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}`;
+}
+
 /** 极简项目记录：只记录哪个项目、什么时间、做了什么 */
 export default function ProjectsApp() {
   const projects = useProjects();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [logText, setLogText] = useState("");
+  const [recordTime, setRecordTime] = useState(() => toDateTimeLocal(now()));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [editTime, setEditTime] = useState("");
 
   const effectiveId = selectedId ?? projects[0]?.id ?? null;
   const project = projects.find((p) => p.id === effectiveId) ?? null;
@@ -68,9 +84,11 @@ export default function ProjectsApp() {
     if (!project) return;
     const text = logText.trim();
     if (!text) return;
-    addProjectLog(project.id, text);
+    const ts = recordTime ? new Date(recordTime).getTime() : now();
+    addProjectLog(project.id, text, "note", Number.isFinite(ts) ? ts : now());
     logActivity("project", "添加项目记录", `${project.name} · ${text.slice(0, 40)}`);
     setLogText("");
+    setRecordTime(toDateTimeLocal(now()));
   };
 
   const handleDeleteLog = async (logId: string, text: string) => {
@@ -87,9 +105,10 @@ export default function ProjectsApp() {
     toast.success("已删除该记录");
   };
 
-  const startEditLog = (logId: string, text: string) => {
+  const startEditLog = (logId: string, text: string, time: number) => {
     setEditingId(logId);
     setEditText(text);
+    setEditTime(toDateTimeLocal(time));
   };
 
   const saveEditLog = () => {
@@ -99,7 +118,13 @@ export default function ProjectsApp() {
       setEditingId(null);
       return;
     }
-    updateProjectLog(project.id, editingId, text);
+    const ts = editTime ? new Date(editTime).getTime() : undefined;
+    updateProjectLog(
+      project.id,
+      editingId,
+      text,
+      ts !== undefined && Number.isFinite(ts) ? ts : undefined,
+    );
     logActivity("project", "修改项目记录", project.name);
     toast.success("记录已更新");
     setEditingId(null);
@@ -193,6 +218,13 @@ export default function ProjectsApp() {
             {/* 记录输入（主角） */}
             <form className="mt-4 flex items-center gap-2" onSubmit={handleRecord}>
               <input
+                type="datetime-local"
+                value={recordTime}
+                onChange={(e) => setRecordTime(e.target.value)}
+                className="shrink-0 rounded-lg border border-zinc-300 bg-white px-2 py-2 text-xs tabular-nums outline-none transition-colors focus:border-amber-500 dark:border-zinc-700 dark:bg-zinc-950/60"
+                title="记录时间（默认当前时间）"
+              />
+              <input
                 type="text"
                 value={logText}
                 onChange={(e) => setLogText(e.target.value)}
@@ -220,22 +252,54 @@ export default function ProjectsApp() {
                     <span className="z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500 ring-2 ring-zinc-50 dark:ring-zinc-950/40" />
                     <div className="min-w-0 flex-1">
                       {editingId === log.id ? (
-                        <input
-                          type="text"
-                          value={editText}
-                          onChange={(e) => setEditText(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                              e.preventDefault();
-                              saveEditLog();
-                            } else if (e.key === "Escape") {
-                              setEditingId(null);
-                            }
-                          }}
-                          onBlur={saveEditLog}
-                          className="w-full rounded-md border border-amber-500 bg-white px-2 py-1 text-sm outline-none ring-2 ring-amber-500/20 dark:bg-zinc-950/60"
-                          autoFocus
-                        />
+                        <div className="space-y-1.5">
+                          <input
+                            type="text"
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                                e.preventDefault();
+                                saveEditLog();
+                              } else if (e.key === "Escape") {
+                                setEditingId(null);
+                              }
+                            }}
+                            className="w-full rounded-md border border-amber-500 bg-white px-2 py-1 text-sm outline-none ring-2 ring-amber-500/20 dark:bg-zinc-950/60"
+                            autoFocus
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="datetime-local"
+                              value={editTime}
+                              onChange={(e) => setEditTime(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                                  e.preventDefault();
+                                  saveEditLog();
+                                } else if (e.key === "Escape") {
+                                  setEditingId(null);
+                                }
+                              }}
+                              className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs tabular-nums outline-none focus:border-amber-500 dark:border-zinc-700 dark:bg-zinc-950/60"
+                              title="修改记录时间"
+                            />
+                            <button
+                              type="button"
+                              onClick={saveEditLog}
+                              className="rounded-md bg-orange-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-500"
+                            >
+                              ✓ 保存
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(null)}
+                              className="rounded-md border border-zinc-300 px-2 py-1 text-xs text-zinc-500 transition-colors hover:border-zinc-400 dark:border-zinc-700 dark:text-zinc-400"
+                            >
+                              取消
+                            </button>
+                          </div>
+                        </div>
                       ) : (
                         <>
                           <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">
@@ -251,7 +315,7 @@ export default function ProjectsApp() {
                       <span className="absolute right-0 top-0 flex items-center gap-0.5 opacity-0 transition-all group-hover:opacity-100">
                         <button
                           type="button"
-                          onClick={() => startEditLog(log.id, log.text)}
+                          onClick={() => startEditLog(log.id, log.text, log.time)}
                           className="flex h-6 w-6 items-center justify-center rounded-md text-zinc-300 transition-colors hover:bg-amber-500/10 hover:text-orange-500"
                           title="修改这条记录"
                         >

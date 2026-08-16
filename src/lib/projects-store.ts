@@ -217,7 +217,12 @@ export function setProjectStage(id: string, stage: ProjectStage): void {
 }
 
 /** 手动添加一条项目记录（时间节点），kind 缺省为 note */
-export function addProjectLog(id: string, text: string, kind: ProjectLogKind = "note"): void {
+export function addProjectLog(
+  id: string,
+  text: string,
+  kind: ProjectLogKind = "note",
+  time: number = Date.now(),
+): void {
   const content = text.trim();
   if (!content) return;
   updateProjects((prev) =>
@@ -227,7 +232,7 @@ export function addProjectLog(id: string, text: string, kind: ProjectLogKind = "
             ...p,
             logs: [
               ...p.logs,
-              { id: crypto.randomUUID(), time: Date.now(), kind, text: content },
+              { id: crypto.randomUUID(), time, kind, text: content },
             ],
             updatedAt: Date.now(),
           }
@@ -455,8 +460,13 @@ export function deleteProjectLog(id: string, logId: string): void {
   );
 }
 
-/** 修改单条记录内容 */
-export function updateProjectLog(id: string, logId: string, text: string): void {
+/** 修改单条记录内容（可同时修改时间） */
+export function updateProjectLog(
+  id: string,
+  logId: string,
+  text: string,
+  time?: number,
+): void {
   const content = text.trim();
   if (!content) return;
   updateProjects((prev) =>
@@ -464,7 +474,9 @@ export function updateProjectLog(id: string, logId: string, text: string): void 
       p.id === id
         ? {
             ...p,
-            logs: p.logs.map((l) => (l.id === logId ? { ...l, text: content } : l)),
+            logs: p.logs.map((l) =>
+              l.id === logId ? { ...l, text: content, time: time ?? l.time } : l,
+            ),
             updatedAt: Date.now(),
           }
         : p,
