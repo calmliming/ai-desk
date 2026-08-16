@@ -17,7 +17,7 @@ export const PROVIDER_PRESETS: ProviderConfig[] = [
     name: "OpenAI",
     baseURL: "https://api.openai.com/v1",
     apiKey: "",
-    models: ["gpt-5", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4-mini"],
+    models: ["gpt-5", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.5", "gpt-5.4-mini"],
     builtin: true,
   },
   {
@@ -25,7 +25,7 @@ export const PROVIDER_PRESETS: ProviderConfig[] = [
     name: "Moonshot · Kimi",
     baseURL: "https://api.moonshot.cn/v1",
     apiKey: "",
-    models: ["kimi-k2.6"],
+    models: ["kimi-k2.6", "kimi-k2.7-code"],
     builtin: true,
   },
   {
@@ -33,7 +33,14 @@ export const PROVIDER_PRESETS: ProviderConfig[] = [
     name: "通义千问 · Qwen",
     baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     apiKey: "",
-    models: ["qwen-max", "qwen-plus", "qwen-turbo", "qwen-vl-max", "qwen-vl-plus"],
+    models: [
+      "qwen-max",
+      "qwen3.7-max",
+      "qwen-plus",
+      "qwen3.7-plus",
+      "qwen-vl-max",
+      "qwen-vl-plus",
+    ],
     builtin: true,
   },
 ];
@@ -47,11 +54,20 @@ export const CUSTOM_PROVIDER: ProviderConfig = {
 };
 
 /** 已停用的旧预设模型列表（用于自动迁移已保存的设置） */
-const OUTDATED_MODEL_LISTS: Record<string, string[]> = {
-  deepseek: ["deepseek-chat", "deepseek-reasoner"],
-  openai: ["gpt-4o", "gpt-4o-mini", "o3-mini", "gpt-4.1"],
-  moonshot: ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
-  qwen: ["qwen-turbo", "qwen-plus", "qwen-max"],
+const OUTDATED_MODEL_LISTS: Record<string, string[][]> = {
+  deepseek: [["deepseek-chat", "deepseek-reasoner"]],
+  openai: [
+    ["gpt-4o", "gpt-4o-mini", "o3-mini", "gpt-4.1"],
+    ["gpt-5", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4-mini"],
+  ],
+  moonshot: [
+    ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
+    ["kimi-k2.6"],
+  ],
+  qwen: [
+    ["qwen-turbo", "qwen-plus", "qwen-max"],
+    ["qwen-max", "qwen-plus", "qwen-turbo", "qwen-vl-max", "qwen-vl-plus"],
+  ],
 };
 
 /**
@@ -59,13 +75,15 @@ const OUTDATED_MODEL_LISTS: Record<string, string[]> = {
  * 迁移为最新预设，保留 API Key 等用户配置。
  */
 export function migrateProviderModels(provider: ProviderConfig): ProviderConfig {
-  const outdated = OUTDATED_MODEL_LISTS[provider.id];
+  const outdatedLists = OUTDATED_MODEL_LISTS[provider.id];
   const preset = PROVIDER_PRESETS.find((p) => p.id === provider.id);
-  if (!outdated || !preset) return provider;
-  const isOldList =
-    outdated.length === provider.models.length &&
-    outdated.every((m, i) => provider.models[i] === m);
-  return isOldList ? { ...provider, models: [...preset.models] } : provider;
+  if (!outdatedLists || !preset) return provider;
+  const isOutdated = outdatedLists.some(
+    (list) =>
+      list.length === provider.models.length &&
+      list.every((m, i) => provider.models[i] === m),
+  );
+  return isOutdated ? { ...provider, models: [...preset.models] } : provider;
 }
 
 /** 生成默认设置（apiKey 留空） */
