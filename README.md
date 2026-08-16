@@ -19,8 +19,8 @@ pnpm lint           # 代码检查
 pnpm generate:icons # 重新生成站点图标（icon.svg / icon.png / apple-icon.png）
 ```
 
-首次使用：进入「设置」页，选择一个提供商（DeepSeek / OpenAI / Moonshot / 通义千问 / 自定义
-OpenAI 兼容接口）并填入 API Key。密钥仅保存在浏览器 localStorage，不写入代码库。
+首次使用：进入「设置」页，选择一个提供商（DeepSeek / OpenAI / Anthropic Claude / Moonshot /
+通义千问 / 自定义 OpenAI 兼容接口）并填入 API Key。密钥仅保存在浏览器 localStorage，不写入代码库。
 
 ## 功能路线
 

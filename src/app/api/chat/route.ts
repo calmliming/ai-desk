@@ -117,23 +117,54 @@ function extractText(content: unknown): string {
   return "";
 }
 
+/**
+ * 构建 Anthropic Messages API 请求体。
+ * - Claude（providerId=anthropic）：system 用顶层字段、思考需 budget_tokens
+ * - DeepSeek 兼容端点：system 放 messages 中（官方 MCP 用法）
+ */
 function buildAnthropicBody(body: ChatRequestBody): string {
-  return JSON.stringify({
+  const isAnthropic = body.providerId === "anthropic";
+  const systemParts: string[] = [timeSystemMessage().content];
+  const messages: { role: string; content: string }[] = [];
+  for (const m of body.messages ?? []) {
+    const content = extractText(m.content);
+    if (m.role === "system") {
+      systemParts.push(content);
+      continue;
+    }
+    messages.push({ role: m.role === "assistant" ? "assistant" : "user", content });
+  }
+  const systemText = systemParts.join("\n\n");
+
+  const out: Record<string, unknown> = {
     model: body.model,
     max_tokens: typeof body.maxTokens === "number" && body.maxTokens > 0 ? body.maxTokens : 8192,
-    messages: [
-      timeSystemMessage(),
-      ...(body.messages ?? []).map((m) => ({
-        role: m.role === "system" || m.role === "assistant" ? m.role : "user",
-        content: extractText(m.content),
-      })),
-    ],
-    tools: [{ type: "web_search_20250305", name: "web_search" }],
-    tool_choice: { type: "auto" },
-    // 思考模式：默认开启（产生 thinking_delta 事件，翻译层会转为 reasoning_content）
-    thinking: { type: body.thinking === false ? "disabled" : "enabled" },
     stream: true,
-  });
+  };
+
+  if (isAnthropic) {
+    out.system = systemText;
+    // Claude 思考需要预算；关闭时用 disabled
+    out.thinking =
+      body.thinking === false
+        ? { type: "disabled" }
+        : { type: "enabled", budget_tokens: 8192 };
+  } else {
+    out.messages = [{ role: "system", content: systemText }, ...messages];
+    out.thinking = { type: body.thinking === false ? "disabled" : "enabled" };
+  }
+  if (!isAnthropic) {
+    // DeepSeek 搜索路径始终带搜索工具
+    out.tools = [{ type: "web_search_20250305", name: "web_search" }];
+    out.tool_choice = { type: "auto" };
+  } else if (body.search) {
+    // Claude 原生联网搜索（Anthropic 服务端工具）
+    out.tools = [{ type: "web_search_20250305", name: "web_search" }];
+    out.tool_choice = { type: "auto" };
+  }
+  // 消息列表最后统一赋值（DeepSeek 分支在上面已赋值）
+  out.messages = isAnthropic ? messages : out.messages;
+  return JSON.stringify(out);
 }
 
 function sseFrame(obj: unknown): Uint8Array {
@@ -269,18 +300,27 @@ export function translateAnthropicStream(
   });
 }
 
-/** DeepSeek 原生联网搜索（Anthropic 兼容端点） */
-async function callAnthropicSearch(
+/**
+ * Anthropic Messages API 调用（Claude 与 DeepSeek 搜索共用），
+ * 并把 Anthropic 流翻译成 OpenAI 格式。
+ */
+async function callAnthropicApi(
   body: ChatRequestBody,
   signal: AbortSignal,
 ): Promise<Response | null> {
   try {
-    const resp = await fetch(`${DEEPSEEK_ANTHROPIC_BASE}/v1/messages`, {
+    const isAnthropic = body.providerId === "anthropic";
+    const base = isAnthropic
+      ? (body.baseURL ?? DEEPSEEK_ANTHROPIC_BASE).replace(/\/+$/, "")
+      : DEEPSEEK_ANTHROPIC_BASE;
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      "x-api-key": body.apiKey ?? "",
+    };
+    if (isAnthropic) headers["anthropic-version"] = "2023-06-01";
+    const resp = await fetch(`${base}/v1/messages`, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": body.apiKey ?? "",
-      },
+      headers,
       body: buildAnthropicBody(body),
       signal,
     });
@@ -369,9 +409,27 @@ export async function POST(req: NextRequest) {
   let searchDropped = false;
   let searchError = "";
 
+  // Claude：一律走 Anthropic Messages API（无 OpenAI 兼容端点）
+  if (body.providerId === "anthropic") {
+    let resp = await callAnthropicApi(body, req.signal);
+    // 思考预算参数不被接受时重试关闭思考
+    if (!resp || (!resp.ok && RETRYABLE_STATUS.includes(resp.status) && body.thinking !== false)) {
+      const retried = await callAnthropicApi({ ...body, thinking: false }, req.signal);
+      if (retried?.ok) resp = retried;
+    }
+    if (!resp || !resp.ok || !resp.body) {
+      const message = await extractUpstreamError(resp);
+      return Response.json(
+        { error: { message, status: resp?.status ?? 502 } },
+        { status: resp?.status ?? 502 },
+      );
+    }
+    upstream = resp;
+  }
+
   // DeepSeek 联网搜索：走 Anthropic 兼容端点
-  if (body.search && body.providerId === "deepseek") {
-    const resp = await callAnthropicSearch(body, req.signal);
+  if (!upstream && body.search && body.providerId === "deepseek") {
+    const resp = await callAnthropicApi(body, req.signal);
     if (!resp || !resp.ok) {
       searchDropped = true;
       searchError = await extractUpstreamError(resp);

@@ -21,6 +21,20 @@ export const PROVIDER_PRESETS: ProviderConfig[] = [
     builtin: true,
   },
   {
+    id: "anthropic",
+    name: "Anthropic · Claude",
+    baseURL: "https://api.anthropic.com",
+    apiKey: "",
+    models: [
+      "claude-fable-5",
+      "claude-fable-5-mythos-5",
+      "claude-4-1-opus",
+      "claude-4-1-opus-thinking",
+      "claude-haiku-4-5",
+    ],
+    builtin: true,
+  },
+  {
     id: "moonshot",
     name: "Moonshot · Kimi",
     baseURL: "https://api.moonshot.cn/v1",
