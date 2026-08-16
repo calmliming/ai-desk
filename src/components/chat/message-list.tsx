@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { extractPreviewBlocks } from "@/lib/html-utils";
 import type { ChatMessage } from "@/lib/types";
 import { IconCopy, IconLogo } from "../icons";
+import HtmlPreview from "./html-preview";
 import Markdown from "./markdown";
 
 export default function MessageList({
@@ -13,6 +15,7 @@ export default function MessageList({
   streaming: boolean;
 }) {
   const lastId = messages.length > 0 ? messages[messages.length - 1].id : null;
+  const [previewBlocks, setPreviewBlocks] = useState<string[] | null>(null);
 
   return (
     <div className="space-y-6">
@@ -42,6 +45,7 @@ export default function MessageList({
           );
         }
         const isLast = m.id === lastId;
+        const previewables = extractPreviewBlocks(m.content);
         return (
           <div key={m.id} className="group flex gap-3">
             <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-md shadow-amber-500/20 ring-1 ring-white/20">
@@ -74,7 +78,7 @@ export default function MessageList({
                   ))}
                 </span>
               ) : null}
-              {(m.usage || m.content) && (
+              {(m.usage || m.content || previewables.length > 0) && (
                 <div className="mt-2 flex items-center gap-3">
                   {m.usage && (
                     <span className="text-[11px] text-zinc-400 dark:text-zinc-600">
@@ -87,6 +91,16 @@ export default function MessageList({
                     </span>
                   )}
                   {m.content && <CopyButton content={m.content} />}
+                  {previewables.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewBlocks(previewables)}
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-orange-600 opacity-0 transition-all hover:text-orange-500 group-hover:opacity-100 dark:text-amber-400"
+                      title="预览生成的 HTML/SVG"
+                    >
+                      🖥 预览
+                    </button>
+                  )}
                 </div>
               )}
               {m.citations && m.citations.length > 0 && (
@@ -115,6 +129,10 @@ export default function MessageList({
           </div>
         );
       })}
+
+      {previewBlocks && (
+        <HtmlPreview blocks={previewBlocks} onClose={() => setPreviewBlocks(null)} />
+      )}
     </div>
   );
 }
