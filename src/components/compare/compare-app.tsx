@@ -10,9 +10,11 @@ import {
   useCompareSlots,
 } from "@/lib/compare-store";
 import { useAppSettings } from "@/lib/settings-store";
+import { extractPreviewBlocks } from "@/lib/html-utils";
 import type { Citation } from "@/lib/types";
 import Select from "@/components/ui/select";
 import { IconCompare, IconCopy, IconGlobe, IconPlus, IconStop, IconX } from "../icons";
+import HtmlPreview from "../chat/html-preview";
 import Markdown from "../chat/markdown";
 
 interface ResultState {
@@ -372,6 +374,8 @@ function ResultCard({
   copied: boolean;
   onCopy: () => void;
 }) {
+  const [showPreview, setShowPreview] = useState(false);
+  const previewables = extractPreviewBlocks(result.content);
   const statusDot = {
     pending: "bg-zinc-300 dark:bg-zinc-600",
     streaming: "animate-pulse bg-amber-500",
@@ -395,6 +399,16 @@ function ResultCard({
           <span className="shrink-0 text-[11px] text-zinc-400 dark:text-zinc-600">
             ↑{result.usage.promptTokens} ↓{result.usage.completionTokens}
           </span>
+        )}
+        {previewables.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowPreview(true)}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-sm text-zinc-400 transition-colors hover:text-orange-600 dark:hover:text-amber-400"
+            title="预览生成的 HTML/SVG"
+          >
+            🖥
+          </button>
         )}
         {result.content && (
           <button
@@ -477,6 +491,10 @@ function ResultCard({
           </div>
         )}
       </div>
+
+      {showPreview && (
+        <HtmlPreview blocks={previewables} onClose={() => setShowPreview(false)} />
+      )}
     </div>
   );
 }
