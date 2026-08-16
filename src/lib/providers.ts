@@ -7,7 +7,7 @@ export const PROVIDER_PRESETS: ProviderConfig[] = [
   {
     id: "deepseek",
     name: "DeepSeek",
-    baseURL: "https://api.deepseek.com/v1",
+    baseURL: "https://api.deepseek.com",
     apiKey: "",
     models: ["deepseek-v4-pro", "deepseek-v4-flash"],
     builtin: true,
@@ -72,9 +72,15 @@ const OUTDATED_MODEL_LISTS: Record<string, string[][]> = {
   ],
 };
 
+/** 已过时的 Base URL（自动迁移为最新官方地址） */
+const OUTDATED_BASE_URLS: Record<string, string> = {
+  deepseek: "https://api.deepseek.com/v1",
+};
+
 /**
  * 若某提供商保存的模型列表仍是旧预设（用户未自定义），
- * 迁移为最新预设，保留 API Key 等用户配置。
+ * 迁移为最新预设，保留 API Key 等用户配置；
+ * 顺带修正过时的 Base URL。
  */
 export function migrateProviderModels(provider: ProviderConfig): ProviderConfig {
   const outdatedLists = OUTDATED_MODEL_LISTS[provider.id];
@@ -85,7 +91,13 @@ export function migrateProviderModels(provider: ProviderConfig): ProviderConfig 
       list.length === provider.models.length &&
       list.every((m, i) => provider.models[i] === m),
   );
-  return isOutdated ? { ...provider, models: [...preset.models] } : provider;
+  const outdatedBase = OUTDATED_BASE_URLS[provider.id] === provider.baseURL;
+  if (!isOutdated && !outdatedBase) return provider;
+  return {
+    ...provider,
+    models: isOutdated ? [...preset.models] : provider.models,
+    baseURL: outdatedBase ? preset.baseURL : provider.baseURL,
+  };
 }
 
 /** 生成默认设置（apiKey 留空） */
