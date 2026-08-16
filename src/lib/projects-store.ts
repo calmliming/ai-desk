@@ -54,6 +54,30 @@ export interface LinkedItem {
   title: string;
 }
 
+export type TaskStatus = "todo" | "doing" | "done";
+export type TaskPriority = "low" | "medium" | "high";
+
+export const TASK_STATUS_META: Record<TaskStatus, { label: string; emoji: string }> = {
+  todo: { label: "待办", emoji: "⬜" },
+  doing: { label: "进行中", emoji: "🔵" },
+  done: { label: "已完成", emoji: "✅" },
+};
+
+export const TASK_PRIORITY_META: Record<TaskPriority, { label: string; badge: string }> = {
+  low: { label: "低", badge: "bg-zinc-500/10 text-zinc-500" },
+  medium: { label: "中", badge: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
+  high: { label: "高", badge: "bg-red-500/15 text-red-600 dark:text-red-400" },
+};
+
+/** 项目任务 */
+export interface ProjectTask {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  createdAt: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -62,6 +86,8 @@ export interface Project {
   milestones: ProjectMilestone[];
   /** 逐条记录的时间节点（创建/阶段流转/手动记录/AI 产出） */
   logs: ProjectLog[];
+  /** 任务列表 */
+  tasks: ProjectTask[];
   /** 已归档（默认不显示在列表） */
   archived?: boolean;
   /** 阻塞标记 */
@@ -84,19 +110,25 @@ const listeners = new Set<() => void>();
 
 /** 旧数据兼容：没有 logs 字段的项目按里程碑回填 */
 function backfillLogs(p: Project): Project {
-  if (Array.isArray(p.logs)) return p;
-  const logs: ProjectLog[] = [
-    { id: `${p.id}-created`, time: p.createdAt, kind: "created", text: "创建项目" },
-  ];
-  for (const m of p.milestones.slice(1)) {
-    logs.push({
-      id: `${p.id}-${m.stage}-${m.time}`,
-      time: m.time,
-      kind: "stage",
-      text: `进入${STAGE_META[m.stage].label}`,
-    });
+  let next = p;
+  if (!Array.isArray(p.logs)) {
+    const logs: ProjectLog[] = [
+      { id: `${p.id}-created`, time: p.createdAt, kind: "created", text: "创建项目" },
+    ];
+    for (const m of p.milestones.slice(1)) {
+      logs.push({
+        id: `${p.id}-${m.stage}-${m.time}`,
+        time: m.time,
+        kind: "stage",
+        text: `进入${STAGE_META[m.stage].label}`,
+      });
+    }
+    next = { ...next, logs };
   }
-  return { ...p, logs };
+  if (!Array.isArray(p.tasks)) {
+    next = { ...next, tasks: [] };
+  }
+  return next;
 }
 
 function load(): Project[] {
@@ -151,6 +183,7 @@ export function createProject(name: string, description?: string): Project {
     stage: "dev",
     milestones: [{ stage: "dev", time: now }],
     logs: [{ id: crypto.randomUUID(), time: now, kind: "created", text: "创建项目" }],
+    tasks: [],
     createdAt: now,
     updatedAt: now,
   };
@@ -352,4 +385,57 @@ export function stageDurationDays(p: Project, stage: ProjectStage): number | nul
   const end = next ?? (p.stage === stage ? Date.now() : null);
   if (!end) return null;
   return Math.max(Math.round((end - start) / 86_400_000), 1);
+}
+
+/** 添加任务 */
+export function addProjectTask(
+  id: string,
+  title: string,
+  priority: TaskPriority = "medium",
+): void {
+  const content = title.trim();
+  if (!content) return;
+  updateProjects((prev) =>
+    prev.map((p) =>
+      p.id === id
+        ? {
+            ...p,
+            tasks: [
+              ...p.tasks,
+              { id: crypto.randomUUID(), title: content, status: "todo", priority, createdAt: Date.now() },
+            ],
+            updatedAt: Date.now(),
+          }
+        : p,
+    ),
+  );
+}
+
+/** 更新任务（状态/标题/优先级） */
+export function updateProjectTask(
+  id: string,
+  taskId: string,
+  patch: Partial<Pick<ProjectTask, "title" | "status" | "priority">>,
+): void {
+  updateProjects((prev) =>
+    prev.map((p) =>
+      p.id === id
+        ? {
+            ...p,
+            tasks: p.tasks.map((t) => (t.id === taskId ? { ...t, ...patch } : t)),
+            updatedAt: Date.now(),
+          }
+        : p,
+    ),
+  );
+}
+
+export function deleteProjectTask(id: string, taskId: string): void {
+  updateProjects((prev) =>
+    prev.map((p) =>
+      p.id === id
+        ? { ...p, tasks: p.tasks.filter((t) => t.id !== taskId), updatedAt: Date.now() }
+        : p,
+    ),
+  );
 }

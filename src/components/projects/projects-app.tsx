@@ -7,8 +7,10 @@ import { streamChat } from "@/lib/chat-client";
 import { usePrompts } from "@/lib/prompts-store";
 import {
   addProjectLog,
+  addProjectTask,
   createProject,
   deleteProject,
+  deleteProjectTask,
   linkProjectPrompt,
   linkProjectSession,
   milestoneTime,
@@ -19,14 +21,18 @@ import {
   stageDurationDays,
   STAGE_META,
   STAGE_ORDER,
+  TASK_PRIORITY_META,
+  TASK_STATUS_META,
   toggleProjectArchived,
   toggleProjectBlocked,
   unlinkProjectPrompt,
   unlinkProjectSession,
   updateProjects,
+  updateProjectTask,
   useProjects,
   type Project,
   type ProjectStage,
+  type TaskPriority,
 } from "@/lib/projects-store";
 import {
   buildProjectAiMessages,
@@ -64,7 +70,7 @@ function now(): number {
   return Date.now();
 }
 
-function formatDate(ts: number | null): string {
+function formatDate(ts: number | null | undefined): string {
   if (!ts) return "—";
   const d = new Date(ts);
   return `${d.getMonth() + 1}-${String(d.getDate()).padStart(2, "0")}`;
@@ -77,7 +83,7 @@ function formatDateTime(ts: number): string {
   ).padStart(2, "0")}`;
 }
 
-type ViewMode = "timeline" | "board";
+type ViewMode = "timeline" | "board" | "calendar";
 type SortMode = "updated" | "stage" | "created";
 
 export default function ProjectsApp() {
@@ -170,6 +176,7 @@ export default function ProjectsApp() {
               [
                 { id: "timeline", label: "时间线" },
                 { id: "board", label: "看板" },
+                { id: "calendar", label: "日历" },
               ] as { id: ViewMode; label: string }[]
             ).map((v) => (
               <button
@@ -231,6 +238,9 @@ export default function ProjectsApp() {
           </div>
         ))}
       </div>
+
+      {/* 周期对比图 */}
+      <CycleChart projects={projects.filter((p) => !p.archived)} />
 
       {/* 搜索 / 排序 / 阶段筛选 / 归档 */}
       <div className="flex flex-wrap items-center gap-2">
@@ -300,6 +310,8 @@ export default function ProjectsApp() {
           setDragOver={setDragOver}
           onStage={handleStage}
         />
+      ) : view === "calendar" ? (
+        <CalendarView projects={visible} />
       ) : (
         <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
           {/* 项目列表 */}
@@ -554,6 +566,8 @@ function ProjectDetail({
   const settings = useAppSettings();
 
   const [logText, setLogText] = useState("");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskPriority, setTaskPriority] = useState<TaskPriority>("medium");
   const [gen, setGen] = useState<GenState | null>(null);
   const [linkSessionId, setLinkSessionId] = useState("");
   const [linkPromptId, setLinkPromptId] = useState("");
@@ -728,6 +742,93 @@ function ProjectDetail({
             );
           })}
         </div>
+      </div>
+
+      {/* 任务清单 */}
+      <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+        <p className="mb-2 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+          ✅ 任务清单（{p.tasks.filter((t) => t.status === "done").length}/{p.tasks.length}）
+        </p>
+        {p.tasks.length > 0 && (
+          <ul className="space-y-1">
+            {p.tasks.map((t) => (
+              <li
+                key={t.id}
+                className="group flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-900/60"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateProjectTask(p.id, t.id, {
+                      status:
+                        t.status === "todo" ? "doing" : t.status === "doing" ? "done" : "todo",
+                    })
+                  }
+                  className="shrink-0 text-sm"
+                  title={`状态：${TASK_STATUS_META[t.status].label}（点击切换）`}
+                >
+                  {TASK_STATUS_META[t.status].emoji}
+                </button>
+                <span
+                  className={`min-w-0 flex-1 truncate text-xs ${
+                    t.status === "done" ? "text-zinc-400 line-through" : "text-zinc-700 dark:text-zinc-200"
+                  }`}
+                >
+                  {t.title}
+                </span>
+                <span
+                  className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${TASK_PRIORITY_META[t.priority].badge}`}
+                >
+                  {TASK_PRIORITY_META[t.priority].label}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => deleteProjectTask(p.id, t.id)}
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-zinc-300 opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
+                  title="删除任务"
+                >
+                  <IconX width={10} height={10} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <form
+          className="mt-2 flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const title = taskTitle.trim();
+            if (!title) return;
+            addProjectTask(p.id, title, taskPriority);
+            logActivity("project", "添加任务", `${p.name} · ${title.slice(0, 40)}`);
+            setTaskTitle("");
+          }}
+        >
+          <input
+            type="text"
+            value={taskTitle}
+            onChange={(e) => setTaskTitle(e.target.value)}
+            placeholder="添加任务，如：搭建登录模块…"
+            className={`${inputCls} !py-1.5 text-xs`}
+          />
+          <Select
+            value={taskPriority}
+            onChange={(e) => setTaskPriority(e.target.value as TaskPriority)}
+            className="shrink-0"
+            title="优先级"
+          >
+            <option value="high">高</option>
+            <option value="medium">中</option>
+            <option value="low">低</option>
+          </Select>
+          <button
+            type="submit"
+            disabled={!taskTitle.trim()}
+            className="shrink-0 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            添加
+          </button>
+        </form>
       </div>
 
       {/* 操作行 */}
@@ -1052,6 +1153,192 @@ function ProjectDetail({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** 周期对比图：每个项目开发(琥珀)+测试(天蓝)历时堆叠条 */
+function CycleChart({ projects }: { projects: Project[] }) {
+  const rows = projects
+    .map((p) => {
+      const dev = stageDurationDays(p, "dev") ?? 0;
+      const test = stageDurationDays(p, "test") ?? 0;
+      return { p, dev, test, total: dev + test };
+    })
+    .filter((r) => r.total > 0);
+
+  if (rows.length === 0) return null;
+  const max = Math.max(...rows.map((r) => r.total), 1);
+
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 dark:shadow-none">
+      <p className="mb-3 text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+        📊 周期对比（开发 + 测试，天）
+      </p>
+      <div className="space-y-2">
+        {rows.map(({ p, dev, test, total }) => (
+          <div key={p.id} className="flex items-center gap-3">
+            <span className="w-36 shrink-0 truncate text-xs text-zinc-600 dark:text-zinc-300" title={p.name}>
+              {p.blocked ? "⚠️ " : ""}
+              {p.name}
+            </span>
+            <div className="flex h-4 flex-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+              <div
+                className="h-full bg-gradient-to-r from-amber-500 to-amber-400"
+                style={{ width: `${(dev / max) * 100}%` }}
+                title={`开发 ${dev} 天`}
+              />
+              <div
+                className="h-full bg-sky-500/80"
+                style={{ width: `${(test / max) * 100}%` }}
+                title={`测试 ${test} 天`}
+              />
+            </div>
+            <span className="w-12 shrink-0 text-right text-[10px] tabular-nums text-zinc-400">
+              {total} 天
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex gap-4 text-[10px] text-zinc-400">
+        <span className="flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-amber-500" /> 开发
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-sky-500" /> 测试
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** 日历视图：按截止日期排布项目 */
+function CalendarView({ projects }: { projects: Project[] }) {
+  const today = new Date();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+
+  const first = new Date(year, month, 1);
+  const startWeekday = first.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array.from({ length: startWeekday }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const byDay = new Map<number, Project[]>();
+  for (const p of projects) {
+    if (!p.deadline) continue;
+    const d = new Date(p.deadline);
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      byDay.set(d.getDate(), [...(byDay.get(d.getDate()) ?? []), p]);
+    }
+  }
+  const noDeadline = projects.filter((p) => !p.deadline).length;
+  const isToday = (day: number) =>
+    day === today.getDate() && year === today.getFullYear() && month === today.getMonth();
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (month === 0) {
+              setMonth(11);
+              setYear((y) => y - 1);
+            } else setMonth((m) => m - 1);
+          }}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-300 text-zinc-600 transition-colors hover:border-amber-400 hover:text-orange-600 dark:border-zinc-700 dark:text-zinc-300"
+          title="上一月"
+        >
+          ‹
+        </button>
+        <p className="min-w-[7rem] text-center text-sm font-semibold">
+          {year}年{month + 1}月
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            if (month === 11) {
+              setMonth(0);
+              setYear((y) => y + 1);
+            } else setMonth((m) => m + 1);
+          }}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-300 text-zinc-600 transition-colors hover:border-amber-400 hover:text-orange-600 dark:border-zinc-700 dark:text-zinc-300"
+          title="下一月"
+        >
+          ›
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setYear(today.getFullYear());
+            setMonth(today.getMonth());
+          }}
+          className="ml-auto rounded-lg border border-zinc-300 px-2.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:border-amber-400 hover:text-orange-600 dark:border-zinc-700 dark:text-zinc-300"
+        >
+          回到今天
+        </button>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 dark:shadow-none">
+        <div className="grid grid-cols-7 border-b border-zinc-200 dark:border-zinc-800">
+          {["日", "一", "二", "三", "四", "五", "六"].map((w) => (
+            <p key={w} className="py-2 text-center text-xs font-medium text-zinc-400">
+              {w}
+            </p>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
+          {cells.map((day, i) => (
+            <div
+              key={i}
+              className={`min-h-[5.5rem] border-b border-r border-zinc-100 p-1.5 dark:border-zinc-800/60 ${
+                i % 7 === 6 ? "border-r-0" : ""
+              }`}
+            >
+              {day !== null && (
+                <>
+                  <p
+                    className={`mb-1 text-right text-[11px] tabular-nums ${
+                      isToday(day)
+                        ? "font-bold text-orange-600 dark:text-amber-400"
+                        : "text-zinc-400"
+                    }`}
+                  >
+                    {day}
+                  </p>
+                  <div className="space-y-1">
+                    {(byDay.get(day) ?? []).map((p) => {
+                      const overdue = p.deadline! < now() && p.stage !== "live";
+                      return (
+                        <p
+                          key={p.id}
+                          className={`truncate rounded-md px-1.5 py-0.5 text-[10px] font-medium ${STAGE_META[p.stage].badge} ${
+                            overdue ? "ring-1 ring-red-500/60" : ""
+                          }`}
+                          title={`${p.name} · 截止 ${formatDate(p.deadline)}${overdue ? "（已逾期）" : ""}`}
+                        >
+                          {p.blocked ? "⚠️" : ""}
+                          {STAGE_META[p.stage].emoji} {p.name}
+                        </p>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {noDeadline > 0 && (
+        <p className="text-xs text-zinc-400 dark:text-zinc-600">
+          💡 另有 {noDeadline} 个项目未设置截止日期，在详情面板中补上即可出现在日历中。
+        </p>
+      )}
     </div>
   );
 }

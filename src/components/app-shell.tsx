@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType, ReactNode, SVGProps } from "react";
+import { useEffect, type ComponentType, type ReactNode, type SVGProps } from "react";
 import { toggleTheme, useIsDark } from "@/lib/theme";
 import { toggleSidebar, useSidebarCollapsed } from "@/lib/ui-store";
+import { openCommandPalette } from "@/lib/command-store";
 import Toaster from "@/components/ui/toaster";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
+import CommandPalette from "@/components/ui/command-palette";
 import {
   IconChat,
   IconChevronsLeft,
@@ -53,6 +55,18 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href + "/") || pathname === href;
+
+  // Cmd/Ctrl+K 呼出命令面板
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        openCommandPalette();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div className="flex h-dvh w-full">
@@ -187,6 +201,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {/* 全局弹窗组件 */}
       <Toaster />
       <ConfirmDialog />
+      <CommandPalette dark={dark} />
     </div>
   );
 }
