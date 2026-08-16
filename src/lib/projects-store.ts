@@ -439,3 +439,18 @@ export function deleteProjectTask(id: string, taskId: string): void {
     ),
   );
 }
+
+/** 删除单条记录 */
+export function deleteProjectLog(id: string, logId: string): void {
+  updateProjects((prev) =>
+    prev.map((p) =>
+      p.id === id
+        ? {
+            ...p,
+            logs: p.logs.filter((l) => l.id !== logId),
+            updatedAt: Date.now(),
+          }
+        : p,
+    ),
+  );
+}

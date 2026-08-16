@@ -8,11 +8,12 @@ import {
   addProjectLog,
   createProject,
   deleteProject,
+  deleteProjectLog,
   updateProjects,
   useProjects,
   type Project,
 } from "@/lib/projects-store";
-import { IconPlus, IconTrash } from "../icons";
+import { IconPlus, IconTrash, IconX } from "../icons";
 
 const inputCls =
   "w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2 text-sm outline-none transition-colors placeholder:text-zinc-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 dark:border-zinc-700 dark:bg-zinc-950/60";
@@ -67,6 +68,20 @@ export default function ProjectsApp() {
     addProjectLog(project.id, text);
     logActivity("project", "添加项目记录", `${project.name} · ${text.slice(0, 40)}`);
     setLogText("");
+  };
+
+  const handleDeleteLog = async (logId: string, text: string) => {
+    if (!project) return;
+    const ok = await confirmDialog({
+      message: "删除这条记录？",
+      detail: text.slice(0, 80),
+      confirmLabel: "删除",
+      danger: true,
+    });
+    if (!ok) return;
+    deleteProjectLog(project.id, logId);
+    logActivity("project", "删除项目记录", project.name);
+    toast.success("已删除该记录");
   };
 
   return (
@@ -180,9 +195,9 @@ export default function ProjectsApp() {
               <div className="relative max-h-[58vh] space-y-3 overflow-y-auto pl-1">
                 <span className="absolute bottom-1 left-[5px] top-1 w-px bg-zinc-200 dark:bg-zinc-700" />
                 {[...project.logs].reverse().map((log) => (
-                  <div key={log.id} className="relative flex gap-3">
+                  <div key={log.id} className="group relative flex gap-3">
                     <span className="z-10 mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500 ring-2 ring-zinc-50 dark:ring-zinc-950/40" />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">
                         {log.text}
                       </p>
@@ -190,6 +205,14 @@ export default function ProjectsApp() {
                         {formatDateTime(log.time)}
                       </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteLog(log.id, log.text)}
+                      className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-md text-zinc-300 opacity-0 transition-all hover:bg-red-500/10 hover:text-red-500 group-hover:opacity-100"
+                      title="删除这条记录"
+                    >
+                      <IconX width={12} height={12} />
+                    </button>
                   </div>
                 ))}
                 {project.logs.length === 0 && (
