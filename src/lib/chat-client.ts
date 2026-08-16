@@ -3,6 +3,8 @@
  * 解析上游 SSE，把增量文本回调给调用方。
  */
 
+import type { Citation } from "./types";
+
 /** OpenAI 兼容的多模态消息内容 */
 export type ChatContent =
   | string
@@ -36,6 +38,8 @@ export interface StreamHandlers {
   onDelta: (content: string, reasoning: string) => void;
   /** 上游返回 usage 统计时触发（通常出现在流末尾） */
   onUsage?: (usage: UsageStats) => void;
+  /** 联网搜索引用来源更新时触发（携带累计列表） */
+  onCitations?: (citations: Citation[]) => void;
   onDone: () => void;
   onError: (message: string) => void;
 }
@@ -77,6 +81,8 @@ export async function streamChat(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  const citations: Citation[] = [];
+  const seenUrls = new Set<string>();
 
   try {
     for (;;) {
@@ -95,7 +101,18 @@ export async function streamChat(
           if (!payload || payload === "[DONE]") continue;
           try {
             const json = JSON.parse(payload) as {
-              choices?: { delta?: { content?: string; reasoning_content?: string } }[];
+              choices?: {
+                delta?: {
+                  content?: string;
+                  reasoning_content?: string;
+                  annotations?: Array<{
+                    type?: string;
+                    url?: string;
+                    title?: string;
+                    url_citation?: { url?: string; title?: string };
+                  }>;
+                };
+              }[];
               usage?: { prompt_tokens?: number; completion_tokens?: number };
             };
             // 统计帧（DeepSeek / OpenAI 在流末尾返回）
@@ -108,6 +125,18 @@ export async function streamChat(
             }
             const delta = json.choices?.[0]?.delta;
             if (!delta) continue;
+            // 联网搜索引用（OpenAI url_citation 等）
+            if (delta.annotations && delta.annotations.length > 0) {
+              let changed = false;
+              for (const ann of delta.annotations) {
+                const url = ann.url_citation?.url ?? ann.url;
+                if (typeof url !== "string" || !url || seenUrls.has(url)) continue;
+                seenUrls.add(url);
+                citations.push({ url, title: ann.url_citation?.title ?? ann.title });
+                changed = true;
+              }
+              if (changed) handlers.onCitations?.(citations.map((c) => ({ ...c })));
+            }
             handlers.onDelta(delta.content ?? "", delta.reasoning_content ?? "");
           } catch {
             // 忽略无法解析的帧

@@ -84,6 +84,28 @@ export default function MessageList({
                   {m.content && <CopyButton content={m.content} />}
                 </div>
               )}
+              {m.citations && m.citations.length > 0 && (
+                <div className="mt-2 space-y-1 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/70">
+                  <p className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                    📚 引用来源
+                  </p>
+                  <ul className="space-y-0.5">
+                    {m.citations.map((c, i) => (
+                      <li key={c.url} className="truncate">
+                        <a
+                          href={c.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-orange-600 hover:underline dark:text-amber-400"
+                          title={c.url}
+                        >
+                          [{i + 1}] {c.title || c.url}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         );

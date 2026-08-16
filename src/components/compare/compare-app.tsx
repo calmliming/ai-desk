@@ -10,6 +10,7 @@ import {
   useCompareSlots,
 } from "@/lib/compare-store";
 import { useAppSettings } from "@/lib/settings-store";
+import type { Citation } from "@/lib/types";
 import Select from "@/components/ui/select";
 import { IconCompare, IconCopy, IconGlobe, IconPlus, IconStop, IconX } from "../icons";
 import Markdown from "../chat/markdown";
@@ -21,6 +22,7 @@ interface ResultState {
   error?: string;
   durationMs?: number;
   usage?: UsageStats;
+  citations?: Citation[];
 }
 
 const EMPTY_RESULT: ResultState = { status: "pending", content: "", reasoning: "" };
@@ -126,6 +128,12 @@ export default function CompareApp() {
           },
           onUsage: (usage) => {
             setResults((prev) => ({ ...prev, [key]: { ...(prev[key] ?? EMPTY_RESULT), usage } }));
+          },
+          onCitations: (citations) => {
+            setResults((prev) => ({
+              ...prev,
+              [key]: { ...(prev[key] ?? EMPTY_RESULT), citations },
+            }));
           },
           onDone: () => finishSlot(key, { status: "done" }),
           onError: (message) => finishSlot(key, { status: "error", error: message }),
@@ -427,6 +435,26 @@ function ResultCard({
             ))}
           </span>
         ) : null}
+        {result.citations && result.citations.length > 0 && (
+          <div className="mt-3 space-y-0.5 border-t border-zinc-200 pt-2.5 dark:border-zinc-800">
+            <p className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">📚 引用来源</p>
+            <ul className="space-y-0.5">
+              {result.citations.map((c, i) => (
+                <li key={c.url} className="truncate">
+                  <a
+                    href={c.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-orange-600 hover:underline dark:text-amber-400"
+                    title={c.url}
+                  >
+                    [{i + 1}] {c.title || c.url}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

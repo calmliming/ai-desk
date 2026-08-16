@@ -4,7 +4,12 @@ export interface ExportSession {
   title: string;
   model: string;
   updatedAt: number;
-  messages: { role: string; content: string; usage?: { promptTokens: number; completionTokens: number } }[];
+  messages: {
+    role: string;
+    content: string;
+    usage?: { promptTokens: number; completionTokens: number };
+    citations?: { url: string; title?: string }[];
+  }[];
 }
 
 export function sessionToMarkdown(s: ExportSession): string {
@@ -21,7 +26,13 @@ export function sessionToMarkdown(s: ExportSession): string {
       const usage = m.usage
         ? `\n\n*Tokens：↑${m.usage.promptTokens} ↓${m.usage.completionTokens}*`
         : "";
-      lines.push("## 🤖 助手", "", m.content || "（空）", usage, "");
+      const citations =
+        m.citations && m.citations.length > 0
+          ? `\n\n**引用来源：**\n${m.citations
+              .map((c, i) => `- [${i + 1}] [${c.title || c.url}](${c.url})`)
+              .join("\n")}`
+          : "";
+      lines.push("## 🤖 助手", "", m.content || "（空）", usage, citations, "");
     }
   }
   return lines.join("\n").trimEnd() + "\n";

@@ -331,6 +331,22 @@ export default function ChatApp() {
             { persist: false },
           );
         },
+        onCitations: (citations) => {
+          updateSessions(
+            (prev) =>
+              prev.map((s) =>
+                s.id === target.id
+                  ? {
+                      ...s,
+                      messages: s.messages.map((m) =>
+                        m.id === assistantMsg.id ? { ...m, citations } : m,
+                      ),
+                    }
+                  : s,
+              ),
+            { persist: false },
+          );
+        },
         onDone: () => {
           setStreaming(false);
           finish();

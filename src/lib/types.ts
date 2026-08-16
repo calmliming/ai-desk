@@ -19,6 +19,12 @@ export interface AppSettings {
   providers: Record<string, ProviderConfig>;
 }
 
+/** 联网搜索返回的引用来源 */
+export interface Citation {
+  url: string;
+  title?: string;
+}
+
 /** 聊天消息 */
 export interface ChatMessage {
   id: string;
@@ -30,5 +36,7 @@ export interface ChatMessage {
   images?: string[];
   /** Token 用量（上游返回 usage 时填充） */
   usage?: { promptTokens: number; completionTokens: number };
+  /** 联网搜索的引用来源（OpenAI web_search 返回） */
+  citations?: Citation[];
   createdAt: number;
 }
