@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { logActivity } from "@/lib/activity-store";
 import { streamChat, type UsageStats } from "@/lib/chat-client";
 import { useAppSettings } from "@/lib/settings-store";
 import {
@@ -72,6 +73,7 @@ export default function ToolsApp() {
     controllerRef.current = controller;
     setResult({ status: "streaming", content: "", reasoning: "" });
     setRunning(true);
+    logActivity("tool", `执行「${tool.name}」`, text.slice(0, 80));
     const startedAt = Date.now();
 
     const finish = (patch: Partial<ToolResult>) => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { logActivity } from "@/lib/activity-store";
 import { IconCheck, IconEye, IconKey } from "./icons";
 import { CUSTOM_PROVIDER, PROVIDER_PRESETS } from "@/lib/providers";
 import { updateAppSettings, useAppSettings } from "@/lib/settings-store";
@@ -36,6 +37,7 @@ export default function SettingsPanel() {
 
   const handleSetActive = () => {
     persist({ ...settings, activeProviderId: selectedId });
+    logActivity("settings", "切换当前提供商", provider.name);
   };
 
   const handleReset = () => {
@@ -49,6 +51,7 @@ export default function SettingsPanel() {
           : { ...CUSTOM_PROVIDER },
       },
     });
+    logActivity("settings", "恢复默认配置", provider.name);
   };
 
   const handleModelsChange = (value: string) => {
@@ -179,7 +182,10 @@ export default function SettingsPanel() {
         <div className="mt-6 flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={() => persist(settings)}
+            onClick={() => {
+              persist(settings);
+              logActivity("settings", "保存提供商配置", provider.name);
+            }}
             className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-500"
           >
             <IconCheck width={15} height={15} strokeWidth={2.6} />

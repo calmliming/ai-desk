@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { logActivity } from "@/lib/activity-store";
 import {
   updatePrompts,
   usePrompts,
@@ -71,6 +72,7 @@ export default function PromptsApp() {
     updatePrompts((prev) => [p, ...prev]);
     setSelectedId(p.id);
     setValues({});
+    logActivity("prompt", "新建提示词");
   };
 
   const handleDelete = () => {
@@ -78,6 +80,7 @@ export default function PromptsApp() {
     if (!window.confirm(`确定删除「${prompt.title}」？`)) return;
     updatePrompts((prev) => prev.filter((p) => p.id !== prompt.id));
     setSelectedId(null);
+    logActivity("prompt", "删除提示词", prompt.title);
     setValues({});
   };
 
@@ -111,6 +114,7 @@ export default function PromptsApp() {
     a.download = "aidesk-prompts.json";
     a.click();
     URL.revokeObjectURL(url);
+    logActivity("prompt", "导出提示词", `${prompts.length} 条`);
   };
 
   const handleImportFile = (file: File) => {
@@ -141,6 +145,7 @@ export default function PromptsApp() {
         updatePrompts((prev) => [...items, ...prev]);
         setSelectedId(items[0].id);
         setValues({});
+        logActivity("prompt", "导入提示词", `${items.length} 条`);
       } catch {
         window.alert("导入失败：文件不是有效的 JSON，或缺少 title/content 字段。");
       }

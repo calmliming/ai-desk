@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { logActivity } from "@/lib/activity-store";
 import { streamChat, type ChatContent, type UsageStats } from "@/lib/chat-client";
 import type { FileAttachment } from "@/lib/file-reader";
 import { findRoleByPrompt, ROLE_PRESETS } from "@/lib/roles";
@@ -86,11 +87,14 @@ export default function ChatApp() {
     );
     setActiveId(s.id);
     setError(null);
+    logActivity("session", "新建会话");
   };
 
   const handleDelete = (id: string) => {
+    const target = sessions.find((s) => s.id === id);
     deleteSession(id);
     if (activeId === id) setActiveId(null);
+    logActivity("session", "删除会话", target?.title);
   };
 
   const handleProviderChange = (pid: string) => {
@@ -249,6 +253,11 @@ export default function ChatApp() {
     setStreaming(true);
     setError(null);
     scrollToBottom();
+    logActivity(
+      "chat",
+      `发送消息（${target.model}）`,
+      sendText ? sendText.slice(0, 80) : "附件消息",
+    );
 
     const controller = new AbortController();
     abortRef.current = controller;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { logActivity } from "@/lib/activity-store";
 import { streamChat, type UsageStats } from "@/lib/chat-client";
 import {
   MAX_COMPARE_SLOTS,
@@ -65,6 +66,11 @@ export default function CompareApp() {
     for (const s of slots) initial[slotKey(s)] = { ...EMPTY_RESULT };
     setResults(initial);
     setRunning(true);
+    logActivity(
+      "compare",
+      "发起模型对比",
+      `${slots.length} 个模型 · ${q.slice(0, 60)}`,
+    );
 
     const startedAt = Date.now();
     const controllers: AbortController[] = [];

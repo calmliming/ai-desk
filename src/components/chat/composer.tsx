@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { logActivity } from "@/lib/activity-store";
 import { parseAttachment, type FileAttachment } from "@/lib/file-reader";
 import { SLASH_COMMANDS } from "@/lib/tools";
 import { IconPaperclip, IconSend, IconStop, IconX } from "../icons";
@@ -84,6 +85,9 @@ export default function Composer({
       }
     }
     setAttachments((prev) => [...prev, ...added]);
+    if (added.length > 0) {
+      logActivity("file", `添加附件（${added.length} 个）`, added.map((a) => a.name).join("、"));
+    }
     setAttachBusy(false);
   };
 

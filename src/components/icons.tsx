@@ -231,3 +231,13 @@ export function IconChevronDown(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function IconHistory(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+      <path d="M4.5 7.5H2.8M4.5 16.5H2.8M21.2 7.5h-1.7M21.2 16.5h-1.7" strokeWidth={1.4} />
+    </svg>
+  );
+}

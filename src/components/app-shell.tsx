@@ -7,6 +7,7 @@ import { toggleTheme, useIsDark } from "@/lib/theme";
 import {
   IconChat,
   IconCompare,
+  IconHistory,
   IconHome,
   IconLogo,
   IconMoon,
@@ -33,7 +34,10 @@ const NAV_MAIN: NavItem[] = [
   { href: "/prompts", label: "提示词库", icon: IconPrompts },
 ];
 
-const NAV_SYS: NavItem[] = [{ href: "/settings", label: "设置", icon: IconSettings }];
+const NAV_SYS: NavItem[] = [
+  { href: "/settings", label: "设置", icon: IconSettings },
+  { href: "/activity", label: "操作记录", icon: IconHistory },
+];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
