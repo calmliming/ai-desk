@@ -4,6 +4,7 @@ import { useState } from "react";
 import { logActivity } from "@/lib/activity-store";
 import { toast } from "@/lib/toast-store";
 import { streamChat } from "@/lib/chat-client";
+import DataMigration from "./data-migration";
 import { IconCheck, IconEye, IconKey } from "./icons";
 import { CUSTOM_PROVIDER, PROVIDER_PRESETS } from "@/lib/providers";
 import { updateAppSettings, useAppSettings } from "@/lib/settings-store";
@@ -171,6 +172,7 @@ export default function SettingsPanel() {
       </div>
 
       {/* 配置表单 */}
+      <div>
       <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 dark:shadow-none">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/15 to-orange-500/15 text-orange-600 dark:text-amber-400">
@@ -302,6 +304,9 @@ export default function SettingsPanel() {
             {testResult.ok ? "✅" : "⚠️"} {testResult.message}
           </p>
         )}
+      </div>
+
+        <DataMigration />
       </div>
     </div>
   );

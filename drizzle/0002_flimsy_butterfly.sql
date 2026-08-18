@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD CONSTRAINT "projects_stage_check" CHECK ("stage" in ('dev', 'test', 'live'));

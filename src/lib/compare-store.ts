@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { hydrate, persist } from "./remote-store";
 import { RETIRED_MODELS } from "./sessions-store";
 
 /** 参与对比的一个模型槽位 */
@@ -9,32 +10,31 @@ export interface CompareSlot {
 
 export const MAX_COMPARE_SLOTS = 6;
 
-const SLOTS_KEY = "aidesk.compare.v1";
+const RESOURCE = "compare";
 const SERVER_SNAPSHOT: CompareSlot[] = [];
 
 let current: CompareSlot[] | null = null;
+let hydrating = false;
 const listeners = new Set<() => void>();
 
-function load(): CompareSlot[] {
-  if (typeof window === "undefined") return SERVER_SNAPSHOT;
-  try {
-    const raw = window.localStorage.getItem(SLOTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return (parsed as CompareSlot[])
+function startHydrate(): void {
+  if (hydrating) return;
+  hydrating = true;
+  void hydrate<CompareSlot>(RESOURCE).then((data) => {
+    if (data === null || current !== SERVER_SNAPSHOT) return;
+    current = data
       .filter((s) => typeof s.providerId === "string" && typeof s.model === "string")
-      .map((s) =>
-        RETIRED_MODELS[s.model] ? { ...s, model: RETIRED_MODELS[s.model] } : s,
-      );
-  } catch {
-    return [];
-  }
+      .map((s) => (RETIRED_MODELS[s.model] ? { ...s, model: RETIRED_MODELS[s.model] } : s));
+    listeners.forEach((listener) => listener());
+  });
 }
 
 function getSnapshot(): CompareSlot[] {
   if (typeof window === "undefined") return SERVER_SNAPSHOT;
-  if (current === null) current = load();
+  if (current === null) {
+    current = SERVER_SNAPSHOT;
+    startHydrate();
+  }
   return current;
 }
 
@@ -45,7 +45,7 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** 订阅对比槽位（localStorage 持久化） */
+/** 订阅对比槽位（Postgres 持久化） */
 export function useCompareSlots(): CompareSlot[] {
   return useSyncExternalStore(subscribe, getSnapshot, () => SERVER_SNAPSHOT);
 }
@@ -53,13 +53,7 @@ export function useCompareSlots(): CompareSlot[] {
 export function updateCompareSlots(updater: (prev: CompareSlot[]) => CompareSlot[]): void {
   const next = updater(getSnapshot());
   current = next;
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem(SLOTS_KEY, JSON.stringify(next));
-    } catch {
-      // 忽略存储失败
-    }
-  }
+  persist(RESOURCE, getSnapshot);
   listeners.forEach((listener) => listener());
 }
 

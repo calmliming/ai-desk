@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { hydrate, persist } from "./remote-store";
 
 /** 项目阶段：开发 → 测试 → 上线 */
 export type ProjectStage = "dev" | "test" | "live";
@@ -102,10 +103,11 @@ export interface Project {
   updatedAt: number;
 }
 
-const PROJECTS_KEY = "aidesk.projects.v1";
+const RESOURCE = "projects";
 const SERVER_SNAPSHOT: Project[] = [];
 
 let current: Project[] | null = null;
+let hydrating = false;
 const listeners = new Set<() => void>();
 
 /** 旧数据兼容：没有 logs 字段的项目按里程碑回填 */
@@ -131,21 +133,25 @@ function backfillLogs(p: Project): Project {
   return next;
 }
 
-function load(): Project[] {
-  if (typeof window === "undefined") return SERVER_SNAPSHOT;
-  try {
-    const raw = window.localStorage.getItem(PROJECTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as Project[]).map(backfillLogs) : [];
-  } catch {
-    return [];
-  }
+function startHydrate(): void {
+  if (hydrating) return;
+  hydrating = true;
+  void hydrate<Project>(RESOURCE).then((data) => {
+    if (data === null) return;
+    // 合并而非替换，理由同 sessions-store：读回来之前的本地新增不能丢
+    const local = current ?? SERVER_SNAPSHOT;
+    const localIds = new Set(local.map((p) => p.id));
+    current = [...local, ...data.filter((p) => !localIds.has(p.id))].map(backfillLogs);
+    listeners.forEach((listener) => listener());
+  });
 }
 
 function getSnapshot(): Project[] {
   if (typeof window === "undefined") return SERVER_SNAPSHOT;
-  if (current === null) current = load();
+  if (current === null) {
+    current = SERVER_SNAPSHOT;
+    startHydrate();
+  }
   return current;
 }
 
@@ -156,7 +162,7 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** 订阅全部项目（localStorage 持久化） */
+/** 订阅全部项目（Postgres 持久化） */
 export function useProjects(): Project[] {
   return useSyncExternalStore(subscribe, getSnapshot, () => SERVER_SNAPSHOT);
 }
@@ -164,13 +170,7 @@ export function useProjects(): Project[] {
 export function updateProjects(updater: (prev: Project[]) => Project[]): void {
   const next = updater(getSnapshot());
   current = next;
-  if (typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem(PROJECTS_KEY, JSON.stringify(next));
-    } catch {
-      // 忽略存储失败
-    }
-  }
+  persist(RESOURCE, getSnapshot);
   listeners.forEach((listener) => listener());
 }
 

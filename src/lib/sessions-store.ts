@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { hydrate, persist } from "./remote-store";
 import type { ChatMessage } from "./types";
 
 export interface Session {
@@ -21,7 +22,7 @@ export interface Session {
   updatedAt: number;
 }
 
-const SESSIONS_KEY = "aidesk.sessions.v1";
+const RESOURCE = "sessions";
 const SERVER_SNAPSHOT: Session[] = [];
 
 /** 已停用模型 → 现行替代模型（加载旧会话/对比槽位时自动迁移） */
@@ -45,23 +46,30 @@ function migrateSession(s: Session): Session {
 }
 
 let current: Session[] | null = null;
+let hydrating = false;
 const listeners = new Set<() => void>();
 
-function load(): Session[] {
-  if (typeof window === "undefined") return SERVER_SNAPSHOT;
-  try {
-    const raw = window.localStorage.getItem(SESSIONS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as Session[]).map(migrateSession) : [];
-  } catch {
-    return [];
-  }
+/** 首次取快照时异步拉库；期间先用空数组，读回来后再通知重渲染 */
+function startHydrate(): void {
+  if (hydrating) return;
+  hydrating = true;
+  void hydrate<Session>(RESOURCE).then((data) => {
+    if (data === null) return;
+    // 合并而非替换：读回来之前用户可能已新建会话，两边都要保住。
+    // 本地为空（绝大多数情况）时，结果就等于直接采用远端数据。
+    const local = current ?? SERVER_SNAPSHOT;
+    const localIds = new Set(local.map((s) => s.id));
+    current = [...local, ...data.filter((s) => !localIds.has(s.id))].map(migrateSession);
+    listeners.forEach((listener) => listener());
+  });
 }
 
 function getSnapshot(): Session[] {
   if (typeof window === "undefined") return SERVER_SNAPSHOT;
-  if (current === null) current = load();
+  if (current === null) {
+    current = SERVER_SNAPSHOT;
+    startHydrate();
+  }
   return current;
 }
 
@@ -72,7 +80,7 @@ function subscribe(listener: () => void) {
   };
 }
 
-/** 订阅全部会话（localStorage 持久化） */
+/** 订阅全部会话（Postgres 持久化） */
 export function useSessions(): Session[] {
   return useSyncExternalStore(subscribe, getSnapshot, () => SERVER_SNAPSHOT);
 }
@@ -83,13 +91,8 @@ export function updateSessions(
 ): Session[] {
   const next = updater(getSnapshot());
   current = next;
-  if (opts?.persist !== false && typeof window !== "undefined") {
-    try {
-      window.localStorage.setItem(SESSIONS_KEY, JSON.stringify(next));
-    } catch {
-      // 存储失败（如超限）时保持内存态
-    }
-  }
+  // persist:false 用于流式输出途中的高频更新，只走内存，落库交给流结束后那一次
+  if (opts?.persist !== false) persist(RESOURCE, getSnapshot);
   listeners.forEach((listener) => listener());
   return next;
 }

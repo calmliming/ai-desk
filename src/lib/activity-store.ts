@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { hydrate, persist } from "./remote-store";
 
 /** 操作类型 */
 export type ActivityType =
@@ -31,33 +32,42 @@ export const ACTIVITY_META: Record<ActivityType, { label: string; emoji: string 
   project: { label: "项目", emoji: "📁" },
 };
 
-const ACTIVITY_KEY = "aidesk.activity.v1";
-/** 最多保留的条数（防 localStorage 膨胀） */
-const MAX_ENTRIES = 300;
+const RESOURCE = "activity";
+/**
+ * 最多保留的条数。原来是 300，受限于 localStorage 容量；
+ * 进库后放宽到 2000——但仍需上限：持久化是整份集合 PUT，
+ * 条数无限增长会让每次记录都重传全表。
+ */
+const MAX_ENTRIES = 2000;
 const SERVER_SNAPSHOT: ActivityEntry[] = [];
 
 let current: ActivityEntry[] | null = null;
+let hydrating = false;
 const listeners = new Set<() => void>();
 
 function uid(): string {
   return crypto.randomUUID();
 }
 
-function load(): ActivityEntry[] {
-  if (typeof window === "undefined") return SERVER_SNAPSHOT;
-  try {
-    const raw = window.localStorage.getItem(ACTIVITY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as ActivityEntry[]) : [];
-  } catch {
-    return [];
-  }
+function startHydrate(): void {
+  if (hydrating) return;
+  hydrating = true;
+  void hydrate<ActivityEntry>(RESOURCE).then((data) => {
+    if (data === null) return;
+    // 合并而非替换，理由同 sessions-store：读回来之前的本地新增不能丢
+    const local = current ?? SERVER_SNAPSHOT;
+    const localIds = new Set(local.map((a) => a.id));
+    current = [...local, ...data.filter((a) => !localIds.has(a.id))].slice(0, MAX_ENTRIES);
+    listeners.forEach((listener) => listener());
+  });
 }
 
 function getSnapshot(): ActivityEntry[] {
   if (typeof window === "undefined") return SERVER_SNAPSHOT;
-  if (current === null) current = load();
+  if (current === null) {
+    current = SERVER_SNAPSHOT;
+    startHydrate();
+  }
   return current;
 }
 
@@ -66,15 +76,6 @@ function subscribe(listener: () => void) {
   return () => {
     listeners.delete(listener);
   };
-}
-
-function persist(entries: ActivityEntry[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(ACTIVITY_KEY, JSON.stringify(entries));
-  } catch {
-    // 忽略存储失败
-  }
 }
 
 /** 订阅操作记录 */
@@ -93,13 +94,13 @@ export function logActivity(type: ActivityType, title: string, detail?: string):
   };
   const next = [entry, ...getSnapshot()].slice(0, MAX_ENTRIES);
   current = next;
-  persist(next);
+  persist(RESOURCE, getSnapshot);
   listeners.forEach((listener) => listener());
 }
 
 /** 清空全部记录 */
 export function clearActivity(): void {
   current = [];
-  persist([]);
+  persist(RESOURCE, getSnapshot);
   listeners.forEach((listener) => listener());
 }
