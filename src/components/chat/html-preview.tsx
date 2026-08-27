@@ -1,5 +1,6 @@
 "use client";
 
+import { downloadText } from "@/lib/session-export";
 import { IconX } from "../icons";
 
 /** HTML/SVG 代码块预览弹窗（沙盒 iframe 渲染） */
@@ -52,8 +53,22 @@ export default function HtmlPreview({
                 </span>
                 <button
                   type="button"
+                  onClick={() =>
+                    downloadText(
+                      `aidesk-preview-${i + 1}.html`,
+                      block,
+                      "text/html;charset=utf-8",
+                    )
+                  }
+                  className="ml-auto rounded-md px-2 py-0.5 text-xs text-zinc-500 transition-colors hover:bg-amber-500/10 hover:text-orange-600 dark:text-zinc-400 dark:hover:text-amber-400"
+                  title="下载为 .html 文件"
+                >
+                  下载 HTML
+                </button>
+                <button
+                  type="button"
                   onClick={() => openInNewWindow(block)}
-                  className="ml-auto rounded-md px-2 py-0.5 text-xs text-orange-600 transition-colors hover:bg-amber-500/10 dark:text-amber-400"
+                  className="rounded-md px-2 py-0.5 text-xs text-orange-600 transition-colors hover:bg-amber-500/10 dark:text-amber-400"
                 >
                   在新窗口打开 ↗
                 </button>

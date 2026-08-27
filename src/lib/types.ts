@@ -7,8 +7,24 @@ export interface ProviderConfig {
   baseURL: string;
   apiKey: string;
   models: string[];
+  /** 生图模型（走 OpenAI 兼容 /images/generations 接口；留空 = 不支持生图） */
+  imageModel?: string;
   /** 内置预设提供商：名称不可修改 */
   builtin?: boolean;
+}
+
+/** 一个 MCP 服务器（stdio = 本地命令，http = 远程 Streamable HTTP） */
+export interface McpServerConfig {
+  id: string;
+  name: string;
+  type: "stdio" | "http";
+  /** type=stdio：启动命令（如 npx） */
+  command?: string;
+  /** type=stdio：命令参数（如 -y @modelcontextprotocol/server-filesystem） */
+  args?: string[];
+  /** type=http：服务器地址 */
+  url?: string;
+  enabled: boolean;
 }
 
 export interface AppSettings {
@@ -17,6 +33,10 @@ export interface AppSettings {
   /** 当前使用的提供商 id */
   activeProviderId: string;
   providers: Record<string, ProviderConfig>;
+  /** MCP 服务器列表（对话中启用工具时可被模型调用） */
+  mcpServers: McpServerConfig[];
+  /** 回答完成时发送桌面通知（仅页面处于后台时提醒） */
+  notifyOnDone: boolean;
 }
 
 /** 联网搜索返回的引用来源 */
@@ -40,5 +60,7 @@ export interface ChatMessage {
   citations?: Citation[];
   /** 上游实际响应的模型名（用于核对真实模型） */
   modelUsed?: string;
+  /** 回答过程中调用的 MCP 工具（展示用） */
+  toolCalls?: { name: string; args: Record<string, unknown> }[];
   createdAt: number;
 }

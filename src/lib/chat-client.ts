@@ -3,7 +3,7 @@
  * 解析上游 SSE，把增量文本回调给调用方。
  */
 
-import type { Citation } from "./types";
+import type { Citation, McpServerConfig } from "./types";
 
 /** OpenAI 兼容的多模态消息内容 */
 export type ChatContent =
@@ -28,6 +28,10 @@ export interface ChatRequest {
   thinking?: boolean;
   /** 提供商 id（用于注入对应搜索参数） */
   providerId?: string;
+  /** 是否允许模型调用 MCP 工具 */
+  tools?: boolean;
+  /** 已启用的 MCP 服务器（随请求发送，服务端连接执行） */
+  mcpServers?: McpServerConfig[];
 }
 
 export interface UsageStats {
@@ -44,6 +48,8 @@ export interface StreamHandlers {
   onCitations?: (citations: Citation[]) => void;
   /** 上游流中声明的实际模型名（首个数据帧触发） */
   onModel?: (model: string) => void;
+  /** MCP 工具调用更新时触发（携带累计列表） */
+  onToolCall?: (calls: { name: string; args: Record<string, unknown> }[]) => void;
   /** 请求了联网搜索但被上游拒绝、已降级为普通回答时触发（detail 为上游原因） */
   onSearchDropped?: (detail?: string) => void;
   onDone: () => void;
@@ -103,6 +109,7 @@ export async function streamChat(
   let buffer = "";
   const citations: Citation[] = [];
   const seenUrls = new Set<string>();
+  const toolCalls: { name: string; args: Record<string, unknown> }[] = [];
   let modelReported = false;
 
   try {
@@ -128,6 +135,7 @@ export async function streamChat(
                   content?: string;
                   reasoning_content?: string;
                   reasoning?: string;
+                  tool_calls?: { name?: string; args?: Record<string, unknown> }[];
                   annotations?: Array<{
                     type?: string;
                     url?: string;
@@ -153,6 +161,18 @@ export async function streamChat(
             }
             const delta = json.choices?.[0]?.delta;
             if (!delta) continue;
+            // MCP 工具调用（服务端执行后推送的调用记录）
+            if (delta.tool_calls && delta.tool_calls.length > 0) {
+              for (const tc of delta.tool_calls) {
+                if (typeof tc.name === "string" && tc.name) {
+                  toolCalls.push({ name: tc.name, args: tc.args ?? {} });
+                }
+              }
+              handlers.onToolCall?.(
+                toolCalls.map((c) => ({ name: c.name, args: { ...c.args } })),
+              );
+              continue;
+            }
             // 联网搜索引用（OpenAI url_citation 等）
             if (delta.annotations && delta.annotations.length > 0) {
               let changed = false;
@@ -190,4 +210,39 @@ export async function streamChat(
   }
 
   handlers.onDone();
+}
+
+/**
+ * 通过 /api/image 代理生成一张图片，返回图片 data URL。
+ * 失败时抛出带用户可读信息的 Error。
+ */
+export async function generateImage(
+  request: {
+    baseURL: string;
+    apiKey: string;
+    model: string;
+    prompt: string;
+    size?: string;
+  },
+  signal?: AbortSignal,
+): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch("/api/image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+      signal,
+    });
+  } catch (err) {
+    if ((err as Error).name === "AbortError") throw new Error("已取消");
+    throw new Error("网络请求失败，请检查网络连接。");
+  }
+  const data = (await res.json().catch(() => null)) as
+    | { images?: string[]; error?: { message?: string } }
+    | null;
+  if (!res.ok || !data || !data.images?.[0]) {
+    throw new Error(data?.error?.message ?? `请求失败（HTTP ${res.status}）`);
+  }
+  return data.images[0];
 }

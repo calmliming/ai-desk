@@ -9,7 +9,7 @@ export const PROVIDER_PRESETS: ProviderConfig[] = [
     name: "DeepSeek",
     baseURL: "https://api.deepseek.com",
     apiKey: "",
-    models: ["deepseek-v4-pro", "deepseek-v4-flash"],
+    models: ["deepseek-v4-pro", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"],
     builtin: true,
   },
   {
@@ -18,6 +18,7 @@ export const PROVIDER_PRESETS: ProviderConfig[] = [
     baseURL: "https://api.openai.com/v1",
     apiKey: "",
     models: ["gpt-5", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.5", "gpt-5.4-mini"],
+    imageModel: "gpt-image-2",
     builtin: true,
   },
   {
@@ -63,6 +64,7 @@ export const PROVIDER_PRESETS: ProviderConfig[] = [
     baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
     apiKey: "",
     models: ["gemini-3", "gemini-3-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
+    imageModel: "imagen-4.0-generate-001",
     builtin: true,
   },
   {
@@ -101,7 +103,10 @@ export const CUSTOM_PROVIDER: ProviderConfig = {
 
 /** 已停用的旧预设模型列表（用于自动迁移已保存的设置） */
 const OUTDATED_MODEL_LISTS: Record<string, string[][]> = {
-  deepseek: [["deepseek-chat", "deepseek-reasoner"]],
+  deepseek: [
+    ["deepseek-chat", "deepseek-reasoner"],
+    ["deepseek-v4-pro", "deepseek-v4-flash"],
+  ],
   openai: [
     ["gpt-4o", "gpt-4o-mini", "o3-mini", "gpt-4.1"],
     ["gpt-5", "gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4-mini"],
@@ -122,6 +127,25 @@ const OUTDATED_MODEL_LISTS: Record<string, string[][]> = {
 const OUTDATED_BASE_URLS: Record<string, string> = {
   deepseek: "https://api.deepseek.com/v1",
 };
+
+/** 明确支持图片输入（视觉）的模型 */
+const VISION_MODEL_IDS = new Set([
+  "deepseek-v4-flash-vision-exp",
+  "qwen-vl-max",
+  "qwen-vl-plus",
+  "gemini-3",
+  "gemini-3-flash",
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+]);
+
+/**
+ * 判断模型是否支持图片输入：显式登记 + 名称启发式兜底
+ * （自定义提供商或未来新增的 vision/vl 模型靠名称识别）。
+ */
+export function isVisionModel(_providerId: string, model: string): boolean {
+  return VISION_MODEL_IDS.has(model) || /vision|-vl\b|^gpt-5/i.test(model);
+}
 
 /**
  * 若某提供商保存的模型列表仍是旧预设（用户未自定义），
@@ -158,5 +182,7 @@ export function defaultSettings(theme: ThemeMode = "dark"): AppSettings {
     theme,
     activeProviderId: "deepseek",
     providers,
+    mcpServers: [],
+    notifyOnDone: false,
   };
 }

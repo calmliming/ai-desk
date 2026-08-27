@@ -2,6 +2,7 @@ import Link from "next/link";
 import HomeStats from "@/components/home-stats";
 import {
   IconArrowRight,
+  IconChart,
   IconChat,
   IconCheck,
   IconCompare,
@@ -54,6 +55,13 @@ const FEATURES = [
     icon: IconFolder,
     title: "项目记录",
     desc: "简单记录每个项目在什么时间做了什么。",
+    ready: true,
+  },
+  {
+    href: "/stats",
+    icon: IconChart,
+    title: "用量花费",
+    desc: "按提供商与会话统计 token 用量，估算 API 花费。",
     ready: true,
   },
   {
@@ -204,6 +212,11 @@ export default function Home() {
             "角色预设：通用助手 / 代码专家 / 写作助手等",
             "参数调节：温度与最大输出长度，会话级生效",
             "快捷指令：对话中输入 /翻译、/总结 等",
+            "拖拽上传：把文件直接拖进对话窗口任意位置",
+            "语音输入：点击 🎤 语音转文字（Chrome / Safari）",
+            "桌面通知：页面在后台时，回答完成提醒",
+            "花费看板：用量 × 参考价格，按提供商/会话统计",
+            "用量提醒：上下文接近上限时提示新开会话",
           ].map((item) => (
             <li
               key={item}

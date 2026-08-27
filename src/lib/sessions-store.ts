@@ -18,6 +18,14 @@ export interface Session {
   search?: boolean;
   /** 思考模式：true=深度思考（默认），false=快速回答 */
   thinking?: boolean;
+  /** 是否允许模型调用 MCP 工具（默认关闭） */
+  tools?: boolean;
+  /** 置顶（列表里排最前） */
+  pinned?: boolean;
+  /** 收藏 */
+  favorite?: boolean;
+  /** 分组名（空 = 未分组） */
+  group?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -41,8 +49,11 @@ export const RETIRED_MODELS: Record<string, string> = {
 };
 
 function migrateSession(s: Session): Session {
-  const next = RETIRED_MODELS[s.model];
-  return next ? { ...s, model: next } : s;
+  const next = RETIRED_MODELS[s.model] ? { ...s, model: RETIRED_MODELS[s.model] } : { ...s };
+  // 老数据没有这些字段，补默认值让 UI 可以直接用布尔判断
+  if (next.pinned === undefined) next.pinned = false;
+  if (next.favorite === undefined) next.favorite = false;
+  return next;
 }
 
 let current: Session[] | null = null;
@@ -105,6 +116,9 @@ export function createSession(providerId: string, model: string): Session {
     providerId,
     model,
     messages: [],
+    pinned: false,
+    favorite: false,
+    tools: false,
     createdAt: now,
     updatedAt: now,
   };

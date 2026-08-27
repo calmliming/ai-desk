@@ -1,4 +1,6 @@
 import type { NextRequest } from "next/server";
+import { McpSession, toOpenAiTools } from "@/lib/mcp";
+import type { McpServerConfig } from "@/lib/types";
 
 /**
  * OpenAI 兼容的流式对话代理：
@@ -22,10 +24,18 @@ interface ChatRequestBody {
   search?: boolean;
   thinking?: boolean;
   providerId?: string;
+  /** 是否允许模型调用 MCP 工具 */
+  tools?: boolean;
+  /** 客户端配置的 MCP 服务器列表 */
+  mcpServers?: McpServerConfig[];
 }
 
 const ALLOWED_PROTOCOLS = ["https:", "http:"];
 const RETRYABLE_STATUS = [400, 404, 415, 422];
+/** 瞬时错误：稍等后原样重试一次（上游高峰期 503/429 常见） */
+const TRANSIENT_STATUS = [429, 500, 502, 503, 504];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const SSE_HEADERS: Record<string, string> = {
   "Content-Type": "text/event-stream; charset=utf-8",
@@ -96,11 +106,11 @@ function validate(body: ChatRequestBody): { ok: true } | { ok: false; message: s
   return { ok: true };
 }
 
-/** 注入当前时间，让模型准确回答时间类问题（无需搜索） */
+/** 注入当前时间与应用能力提示，让模型准确回答 */
 function timeSystemMessage(): { role: string; content: string } {
   const now = new Date();
   const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
-  const content = `当前时间：${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（周${weekdays[now.getDay()]}）${now.toLocaleTimeString("zh-CN", { hour12: false })}（用户本地时区）。回答涉及“现在/今天/当前时间/星期几/日期”的问题时，请以这个时间为准，不要依赖网页内容。`;
+  const content = `当前时间：${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（周${weekdays[now.getDay()]}）${now.toLocaleTimeString("zh-CN", { hour12: false })}（用户本地时区）。回答涉及“现在/今天/当前时间/星期几/日期”的问题时，请以这个时间为准，不要依赖网页内容。\n你运行在一个支持图片生成的工作台里：如果用户要求画图或生成图片，请直接告诉用户“点击输入框右侧的 🎨 按钮即可生成图片”，并顺手给出 1-2 条精炼的画面提示词建议，不要声称自己无法生成。`;
   return { role: "system", content };
 }
 
@@ -349,6 +359,193 @@ async function extractUpstreamError(resp: Response | null): Promise<string> {
   }
 }
 
+/** MCP 工具调用最多轮数，防止模型在工具间死循环 */
+const MAX_TOOL_ROUNDS = 5;
+
+/**
+ * 带 MCP 工具的对话：非流式循环执行工具调用，
+ * 通过 SSE 把「工具调用记录 → 最终回答」逐步推给客户端。
+ */
+async function handleMcpChat(
+  body: ChatRequestBody,
+  servers: McpServerConfig[],
+  baseURL: string,
+  signal: AbortSignal,
+): Promise<Response> {
+  const session = new McpSession();
+  await session.connect(servers);
+  if (session.tools.length === 0) {
+    await session.close();
+    return Response.json(
+      { error: { message: "已启用的 MCP 服务器没有提供任何工具，请检查服务器配置与连通性。" } },
+      { status: 502 },
+    );
+  }
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const enqueue = (obj: unknown) => controller.enqueue(sseFrame(obj));
+      try {
+        const messages: Array<Record<string, unknown>> = [
+          timeSystemMessage(),
+          ...body.messages!.map(({ role, content }) => ({ role, content })),
+        ];
+        const tools = toOpenAiTools(session.tools);
+        let content = "";
+        let modelUsed = "";
+        let usage: { prompt: number; completion: number } | null = null;
+
+        for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+          const upstreamBody: Record<string, unknown> = {
+            model: body.model,
+            messages,
+            tools,
+            tool_choice: "auto",
+          };
+          if (typeof body.temperature === "number" && Number.isFinite(body.temperature)) {
+            upstreamBody.temperature = body.temperature;
+          }
+          if (typeof body.maxTokens === "number" && body.maxTokens > 0) {
+            upstreamBody.max_tokens = Math.floor(body.maxTokens);
+          }
+          if (body.thinking !== undefined) {
+            const thinkingParams = buildThinkingParams(body.providerId, body.thinking);
+            if (thinkingParams) Object.assign(upstreamBody, thinkingParams);
+          }
+          if (body.search && body.providerId !== "deepseek") {
+            const searchParams = buildSearchParams(body.providerId);
+            if (searchParams) Object.assign(upstreamBody, searchParams);
+          }
+
+          let resp = await fetch(`${baseURL}/chat/completions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${body.apiKey}`,
+            },
+            body: JSON.stringify(upstreamBody),
+            signal,
+          });
+
+          // 瞬时错误：稍等后原样重试一次
+          if (!resp.ok && TRANSIENT_STATUS.includes(resp.status)) {
+            await sleep(900);
+            const retried = await fetch(`${baseURL}/chat/completions`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${body.apiKey}`,
+              },
+              body: JSON.stringify(upstreamBody),
+              signal,
+            });
+            if (retried.ok) resp = retried;
+          }
+
+          if (!resp.ok) {
+            enqueue({ error: { message: await extractUpstreamError(resp) } });
+            controller.close();
+            return;
+          }
+
+          const data = (await resp.json()) as {
+            model?: string;
+            usage?: { prompt_tokens?: number; completion_tokens?: number };
+            choices?: [
+              {
+                message?: {
+                  content?: string | null;
+                  tool_calls?: Array<{
+                    id?: string;
+                    type?: string;
+                    function?: { name?: string; arguments?: string };
+                  }>;
+                };
+              },
+            ];
+          };
+          if (data.model) modelUsed = data.model;
+          const msg = data.choices?.[0]?.message;
+          if (!msg) {
+            enqueue({ error: { message: "上游响应缺少消息内容。" } });
+            controller.close();
+            return;
+          }
+          const calls = msg.tool_calls ?? [];
+          content = msg.content ?? "";
+
+          if (calls.length === 0) {
+            usage = data.usage
+              ? {
+                  prompt: data.usage.prompt_tokens ?? 0,
+                  completion: data.usage.completion_tokens ?? 0,
+                }
+              : null;
+            break;
+          }
+
+          // 执行工具并把结果回传模型
+          messages.push({ role: "assistant", content: content || null, tool_calls: calls });
+          for (const call of calls) {
+            let args: Record<string, unknown> = {};
+            try {
+              args = JSON.parse(call.function?.arguments ?? "{}") as Record<string, unknown>;
+            } catch {
+              args = {};
+            }
+            const name = call.function?.name ?? "unknown";
+            enqueue({ choices: [{ delta: { tool_calls: [{ name, args }] } }] });
+            const resultText = await session.callTool(name, args);
+            messages.push({ role: "tool", tool_call_id: call.id ?? "", content: resultText });
+          }
+        }
+
+        if (!content) {
+          enqueue({ error: { message: "工具调用已完成，但模型未给出最终回答。" } });
+          controller.close();
+          return;
+        }
+        if (modelUsed) enqueue({ model: modelUsed, choices: [{ delta: {} }] });
+        enqueue({ choices: [{ delta: { content } }] });
+        if (usage) {
+          enqueue({
+            usage: { prompt_tokens: usage.prompt, completion_tokens: usage.completion },
+          });
+        }
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      } catch (err) {
+        if ((err as Error).name === "AbortError") {
+          try {
+            controller.close();
+          } catch {
+            // 已关闭
+          }
+          return;
+        }
+        enqueue({
+          error: {
+            message: `工具调用失败：${err instanceof Error ? err.message : String(err)}`,
+          },
+        });
+        try {
+          controller.close();
+        } catch {
+          // 已关闭
+        }
+      } finally {
+        await session.close();
+      }
+    },
+    cancel() {
+      void session.close();
+    },
+  });
+
+  return new Response(stream, { status: 200, headers: SSE_HEADERS });
+}
+
 export async function POST(req: NextRequest) {
   let body: ChatRequestBody;
   try {
@@ -364,6 +561,12 @@ export async function POST(req: NextRequest) {
 
   const baseURL = body.baseURL!.replace(/\/+$/, "");
   const endpoint = `${baseURL}/chat/completions`;
+
+  // MCP 工具调用路径（Claude 走 Anthropic 格式，暂不经过这里）
+  const mcpServers = McpSession.enabled(body.mcpServers);
+  if (body.tools === true && body.providerId !== "anthropic" && mcpServers.length > 0) {
+    return handleMcpChat(body, mcpServers, baseURL, req.signal);
+  }
 
   const buildUpstreamBody = (
     includeUsage: boolean,
@@ -459,6 +662,12 @@ export async function POST(req: NextRequest) {
       ) {
         upstream = await callUpstream(false, false, false);
       }
+    }
+    // 瞬时错误（503/429 等）：稍等后原样重试一次
+    if (!upstream.ok && TRANSIENT_STATUS.includes(upstream.status)) {
+      await sleep(900);
+      const retried = await callUpstream(true, searchSupported, true);
+      if (retried.ok) upstream = retried;
     }
   }
 

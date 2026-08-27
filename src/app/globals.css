@@ -142,13 +142,31 @@ body {
   background: #0d1117;
   padding: 0.9rem 1.1rem;
   overflow-x: auto;
+  /* 代码底色固定深色：文字基础色必须显式设为近白，
+     否则浅色主题下会继承深色正文色导致看不见 */
+  color: #e6edf3;
 }
 .markdown-body pre code {
   background: transparent;
   padding: 0;
+  color: inherit;
   font-family: var(--font-mono);
   font-size: 0.85rem;
   line-height: 1.65;
+}
+.markdown-body .mermaid-block {
+  margin: 0.8em 0;
+  border-radius: 0.75rem;
+  border: 1px solid #e4e4e7;
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+.dark .markdown-body .mermaid-block {
+  border-color: rgb(255 255 255 / 0.08);
+}
+.markdown-body .mermaid-block svg {
+  max-width: 100%;
+  height: auto;
 }
 .markdown-body blockquote {
   margin: 0.6em 0;
@@ -223,4 +241,45 @@ body {
 }
 .dialog-enter {
   animation: dialog-in 0.2s ease-out;
+}
+
+/* 空状态装饰动画（对话框无会话时） */
+@keyframes aidesk-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+@keyframes aidesk-float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@keyframes aidesk-spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-aidesk-float {
+  animation: aidesk-float 4.5s ease-in-out infinite;
+}
+.animate-aidesk-float-soft {
+  animation: aidesk-float-soft 3.5s ease-in-out infinite;
+}
+.animate-aidesk-spin-slow {
+  animation: aidesk-spin-slow 8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-aidesk-float,
+  .animate-aidesk-float-soft,
+  .animate-aidesk-spin-slow {
+    animation: none;
+  }
 }

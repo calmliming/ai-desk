@@ -57,6 +57,11 @@ export const sessions = pgTable("sessions", {
   maxTokens: integer("max_tokens"),
   search: boolean(),
   thinking: boolean(),
+  /** 是否允许模型调用 MCP 工具（默认关闭） */
+  tools: boolean(),
+  pinned: boolean(),
+  favorite: boolean(),
+  groupName: text("group_name"),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull(),
   position: integer().notNull(),
@@ -78,6 +83,8 @@ export const messages = pgTable(
     usage: jsonb().$type<{ promptTokens: number; completionTokens: number }>(),
     citations: jsonb().$type<Citation[]>(),
     modelUsed: text("model_used"),
+    /** 回答过程中调用的 MCP 工具（展示用） */
+    toolCalls: jsonb("tool_calls").$type<{ name: string; args: Record<string, unknown> }[]>(),
     createdAt: bigint("created_at", { mode: "number" }).notNull(),
     position: integer().notNull(),
   },

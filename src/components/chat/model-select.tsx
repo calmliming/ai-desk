@@ -1,6 +1,7 @@
 "use client";
 
 import { useAppSettings } from "@/lib/settings-store";
+import { isVisionModel } from "@/lib/providers";
 import Select from "@/components/ui/select";
 
 export default function ModelSelect({
@@ -43,6 +44,7 @@ export default function ModelSelect({
         {models.map((m) => (
           <option key={m} value={m}>
             {m}
+            {isVisionModel(providerId, m) ? " · 视觉" : ""}
           </option>
         ))}
       </Select>

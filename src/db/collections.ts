@@ -89,6 +89,7 @@ export async function readSessions(): Promise<Session[]> {
       ...(m.usage && { usage: m.usage }),
       ...(m.citations && { citations: m.citations }),
       ...(m.modelUsed !== null && { modelUsed: m.modelUsed }),
+      ...(m.toolCalls && { toolCalls: m.toolCalls }),
       createdAt: m.createdAt,
     });
     bySession.set(m.sessionId, list);
@@ -105,6 +106,10 @@ export async function readSessions(): Promise<Session[]> {
     ...(s.maxTokens !== null && { maxTokens: s.maxTokens }),
     ...(s.search !== null && { search: s.search }),
     ...(s.thinking !== null && { thinking: s.thinking }),
+    ...(s.tools !== null && { tools: s.tools }),
+    ...(s.pinned !== null && { pinned: s.pinned }),
+    ...(s.favorite !== null && { favorite: s.favorite }),
+    ...(s.groupName !== null && { group: s.groupName }),
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
   }));
@@ -121,6 +126,10 @@ export async function writeSessions(data: Session[]): Promise<void> {
     maxTokens: s.maxTokens ?? null,
     search: s.search ?? null,
     thinking: s.thinking ?? null,
+    tools: s.tools ?? null,
+    pinned: s.pinned ?? false,
+    favorite: s.favorite ?? false,
+    groupName: s.group ?? null,
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
     position,
@@ -137,6 +146,7 @@ export async function writeSessions(data: Session[]): Promise<void> {
       usage: m.usage ?? null,
       citations: m.citations ?? null,
       modelUsed: m.modelUsed ?? null,
+      toolCalls: m.toolCalls ?? null,
       createdAt: m.createdAt,
       position,
     })),

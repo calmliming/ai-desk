@@ -31,3 +31,5 @@ pnpm generate:icons # 重新生成站点图标（icon.svg / icon.png / apple-ico
 - [x] 提示词库：变量占位、一键套用、导入导出、内置模板
 - [x] 文件对话：PDF 文本提取、文本文件、图片视觉输入
 - [x] 扩展：会话搜索 / Markdown・JSON 导出、Token 统计、角色预设、温度与最大输出参数
+- [x] 交互增强：全窗口拖拽上传、语音输入（Web Speech API）、后台完成桌面通知
+- [x] 用量与花费：上下文上限提醒、按提供商/会话/日期的花费估算看板（/stats）

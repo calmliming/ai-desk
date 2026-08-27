@@ -10,6 +10,7 @@ import Toaster from "@/components/ui/toaster";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import CommandPalette from "@/components/ui/command-palette";
 import {
+  IconChart,
   IconChat,
   IconChevronsLeft,
   IconChevronsRight,
@@ -41,6 +42,7 @@ const NAV_MAIN: NavItem[] = [
   { href: "/tools", label: "文本工具", icon: IconTools },
   { href: "/prompts", label: "提示词库", icon: IconPrompts },
   { href: "/projects", label: "项目记录", icon: IconFolder },
+  { href: "/stats", label: "用量花费", icon: IconChart },
 ];
 
 const NAV_SYS: NavItem[] = [

@@ -1,9 +1,10 @@
 "use client";
 
 import { memo, useCallback, useState } from "react";
+import { downloadMessageMd, downloadPptx } from "@/lib/file-export";
 import { extractPreviewBlocks } from "@/lib/html-utils";
 import type { ChatMessage } from "@/lib/types";
-import { IconCopy, IconLogo } from "../icons";
+import { IconCopy, IconDownload, IconLogo } from "../icons";
 import HtmlPreview from "./html-preview";
 import Markdown from "./markdown";
 
@@ -98,7 +99,7 @@ const AssistantBlock = memo(function AssistantBlock({
           </details>
         ) : null}
         {m.content ? (
-          <Markdown highlight={!isStreaming}>{m.content}</Markdown>
+          <Markdown>{m.content}</Markdown>
         ) : isStreaming && isLast ? (
           <span className="inline-flex items-center gap-1 py-1.5" aria-label="正在生成">
             {[0, 150, 300].map((delay) => (
@@ -110,6 +111,49 @@ const AssistantBlock = memo(function AssistantBlock({
             ))}
           </span>
         ) : null}
+        {m.toolCalls && m.toolCalls.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {m.toolCalls.map((tc, i) => (
+              <span
+                key={`${tc.name}-${i}`}
+                className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 text-[11px] text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/70 dark:text-zinc-300"
+                title={JSON.stringify(tc.args, null, 2)}
+              >
+                🔧 {tc.name}
+                {Object.keys(tc.args).length > 0 && (
+                  <span className="text-zinc-400 dark:text-zinc-500">
+                    {JSON.stringify(tc.args).slice(0, 40)}
+                  </span>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+        {m.images && m.images.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {m.images.map((url, i) => (
+              <div
+                key={i}
+                className="group/img relative overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`生成的图片 ${i + 1}`}
+                  className="max-h-80 max-w-full object-contain"
+                />
+                <a
+                  href={url}
+                  download={`aidesk-image-${i + 1}.png`}
+                  title="下载图片"
+                  className="absolute right-2 top-2 rounded-md bg-zinc-900/70 px-2 py-1 text-[11px] text-zinc-100 opacity-0 backdrop-blur transition-opacity group-hover/img:opacity-100"
+                >
+                  下载
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
         {(m.usage || m.content || previewables.length > 0) && (
           <div className="mt-2 flex items-center gap-3">
             {m.usage && (
@@ -123,6 +167,7 @@ const AssistantBlock = memo(function AssistantBlock({
               </span>
             )}
             {m.content && <CopyButton content={m.content} />}
+            {m.content && !isStreaming && <SaveButtons content={m.content} />}
             {previewables.length > 0 && (
               <button
                 type="button"
@@ -185,5 +230,54 @@ function CopyButton({ content }: { content: string }) {
       <IconCopy width={12} height={12} />
       {copied ? "已复制" : "复制"}
     </button>
+  );
+}
+
+/** 把单条回答生成为文件：.md 直接下载，.pptx 浏览器端转换后下载 */
+function SaveButtons({ content }: { content: string }) {
+  const [busy, setBusy] = useState<"md" | "ppt" | null>(null);
+
+  const saveMd = () => {
+    downloadMessageMd(content);
+  };
+
+  const savePpt = async () => {
+    if (busy) return;
+    setBusy("ppt");
+    try {
+      await downloadPptx(content);
+    } catch {
+      // 错误已在 downloadPptx 内 toast 提示
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const cls =
+    "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-zinc-400 opacity-0 transition-all hover:text-orange-600 disabled:cursor-not-allowed group-hover:opacity-100 dark:text-zinc-500 dark:hover:text-amber-400";
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={saveMd}
+        disabled={busy !== null}
+        className={cls}
+        title="下载为 Markdown 文件"
+      >
+        <IconDownload width={12} height={12} />
+        MD
+      </button>
+      <button
+        type="button"
+        onClick={savePpt}
+        disabled={busy !== null}
+        className={cls}
+        title="生成 PPT 文件（按 Markdown 标题自动分页）"
+      >
+        <IconDownload width={12} height={12} />
+        {busy === "ppt" ? "生成中…" : "PPT"}
+      </button>
+    </>
   );
 }
